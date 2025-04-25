@@ -9,6 +9,8 @@ from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django import forms
 from .models import CameraSettings
+from django.apps import apps
+from django.db import connection
 
 # Output directories
 RECORD_DIR = os.path.join(settings.MEDIA_ROOT, "recordings")
@@ -21,6 +23,18 @@ camera_lock = threading.Lock()
 camera_instance = None
 
 def get_camera_settings():
+    return CameraSettings.objects.first()
+
+
+def get_camera_settings_safe():
+    # Verhindert Zugriff, wenn Tabelle noch nicht existiert
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1 FROM cameraapp_camerasettings LIMIT 1")
+    except Exception:
+        return None
+
+    CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
 
 def init_camera():
@@ -77,11 +91,15 @@ def video_feed(request):
 @login_required
 def stream_page(request):
     camera_error = None
-    if not is_camera_open():
-        init_camera()
+    settings_obj = get_camera_settings_safe()
+
     if not is_camera_open():
         camera_error = "Cannot open camera"
+    elif settings_obj is None:
+        camera_error = "Settings not ready (DB table missing?)"
+
     return render(request, "cameraapp/stream.html", {"camera_error": camera_error})
+
 
 @login_required
 def record_video(request):
