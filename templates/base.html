@@ -5,24 +5,16 @@
     <meta charset="UTF-8">
     <title>{% block title %}IPCam Dashboard{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'style.css' %}">
-    <style>
-        body {
-            margin: 0;
-            font-family: system-ui, sans-serif;
-            background: #f4f4f4;
-        }
-
-        header {
-            background-color: #222;
-            color: #fff;
-            padding: 1em;
-        }
-    </style>
 </head>
 <body>
-    <header>
-        <h1>{% block title %}IPCam Dashboard{% endblock %}</h1>
-    </header>
+    <nav>
+        <ul class="navbar">
+            <li><a href="{% url 'stream_page' %}">Live Stream</a></li>
+            <li><a href="{% url 'photo_gallery' %}">Gallery</a></li>
+            <li><a href="{% url 'settings_view' %}">Settings</a></li>
+            <li><a href="{% url 'logout' %}">Logout</a></li>
+        </ul>
+    </nav>
 
     <main>
         {% block content %}{% endblock %}
