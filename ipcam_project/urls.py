@@ -18,3 +18,7 @@ urlpatterns = [
 
 # Serve media files (e.g. saved photos/videos) during development
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# ✅ Serve static files in DEBUG mode
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
