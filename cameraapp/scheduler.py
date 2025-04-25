@@ -3,14 +3,18 @@ import os
 import time
 import cv2
 from datetime import datetime
-from .models import CameraSettings
 from django.conf import settings
+from django.apps import apps
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
+def get_camera_settings():
+    CameraSettings = apps.get_model("cameraapp", "CameraSettings")
+    return CameraSettings.objects.first()
+
 def take_photo():
-    settings_obj = CameraSettings.objects.first()
+    settings_obj = get_camera_settings()
     url = settings_obj.default_camera_url if settings_obj else "0"
     camera_url = int(url) if url.isdigit() else url
 
@@ -29,8 +33,9 @@ def take_photo():
     cap.release()
 
 def start_photo_scheduler():
+    time.sleep(10)  # give migrations time to complete
     while True:
-        settings_obj = CameraSettings.objects.first()
+        settings_obj = get_camera_settings()
         if settings_obj and settings_obj.timelapse_enabled:
             take_photo()
             interval = settings_obj.photo_interval_min
