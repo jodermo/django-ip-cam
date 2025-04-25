@@ -177,6 +177,13 @@ django-ip-cam/
 
 ```
 
+```bash
+sudo chmod -R 755 ./nginx/certbot/conf
+sudo chown -R $USER:$USER ./nginx/certbot/conf
+```
+sudo chmod -R 777 ./nginx/certbot/conf
+
+
 
 start cert bot for the first time
 ```bash
