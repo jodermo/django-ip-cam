@@ -1,10 +1,12 @@
 # django-ip-cam
 
+
 A Django-based web application for streaming live video from an IP camera (RTSP or MJPEG), including user authentication and access protection.
 
 ---
 
 ## Features
+
 
 - Live IP camera stream (RTSP/MJPEG)
 - User authentication (login/logout)
@@ -69,8 +71,35 @@ pi
     http://127.0.0.1:8000/
     ```
 
+## Docker
 
+### Build and run with Docker Compose
 
+1. Create a `.env` file in the root directory (same format as above)
+
+2. Build the image:
+
+    ```bash
+    docker-compose build
+    ```
+
+3. Run the services:
+
+    ```bash
+    docker-compose up
+    ```
+
+4. The app will be available at:
+
+    ```
+    http://localhost:8000/
+    ```
+
+### Run migrations manually (optional)
+
+```bash
+docker-compose run web python manage.py migrate
+```
 
 ## Scripts
 
@@ -85,15 +114,34 @@ python manage.py createsuperuser
 ```bash
 django-ip-cam/
 ├── cameraapp/
-│   ├── views.py
-│   ├── urls.py
+│   ├── __init__.py
+│   ├── admin.py                 Admin registration for Camera model
+│   ├── apps.py                  App config and optional signal loading
+│   ├── models.py                Camera model (name, stream_url, active)
+│   ├── tests.py                 Test login protection and stream access
+│   ├── urls.py                  URL routes for camera view and video stream
+│   ├── views.py                 IP camera streaming logic (requires login)
 │   └── templates/
 │       └── cameraapp/
-│           └── stream.html
+│           └── stream.html      Camera stream page with embedded MJPEG
 ├── ipcam_project/
-│   ├── settings.py
-│   ├── urls.py
-├── .env
-├── manage.py
-└── requirements.txt
+│   ├── __init__.py
+│   ├── settings.py              Django settings with .env support and auth config
+│   ├── urls.py                  Root URL routing with login/logout and app include
+│   ├── wsgi.py                  WSGI entry point for Gunicorn or other servers
+│   └── asgi.py                  ASGI entry point for future async support
+├── templates/
+│   └── registration/
+│       └── login.html           Login form used by Django auth system
+├── static/                      Static files directory for CSS or JS
+├── .env                         Environment variables (secret key, camera URL, debug)
+├── .env.example                 Template for .env file
+├── .gitignore                   Ignore rules for Git (env files, cache, venv)
+├── db.sqlite3                   Default SQLite database file
+├── manage.py                    Django management entry script
+├── requirements.txt             Python dependencies for Django, OpenCV, dotenv, gunicorn
+├── Dockerfile                   Docker build file for the application
+├── docker-compose.yml           Compose configuration for running Django and migrations
+└── .dockerignore                Ignore rules during Docker build (like .env and staticfiles)
+
 ```
