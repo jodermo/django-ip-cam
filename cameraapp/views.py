@@ -45,8 +45,13 @@ def init_camera():
     global camera_instance
     settings_obj = get_camera_settings()
     camera_url = settings_obj.default_camera_url if settings_obj else "0"
-    url = int(camera_url) if camera_url.isdigit() else camera_url
+    url = int(camera_url) if str(camera_url).isdigit() else camera_url
+
+    print(f"[CAM INIT] Trying to open camera: {url}")
     camera_instance = cv2.VideoCapture(url)
+    if not camera_instance.isOpened():
+        print("[CAM INIT] Failed to open camera.")
+
 
 def is_camera_open():
     return camera_instance and camera_instance.isOpened()
@@ -94,18 +99,25 @@ def video_feed(request):
 
 @login_required
 def stream_page(request):
+    print("[STREAM PAGE] Checking camera status...")
+
     camera_error = None
     settings_obj = get_camera_settings_safe()
 
     if not is_camera_open():
+        print("[STREAM PAGE] Camera is NOT open.")
         camera_error = "Cannot open camera"
     elif settings_obj is None:
+        print("[STREAM PAGE] Camera settings are missing.")
         camera_error = "Settings not ready (DB table missing?)"
+    else:
+        print("[STREAM PAGE] Camera is open and settings exist.")
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
         "title": "Live Stream"
     })
+
 
 @login_required
 def record_video(request):
