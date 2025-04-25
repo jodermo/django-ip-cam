@@ -11,6 +11,7 @@ from django import forms
 from .models import CameraSettings
 from django.apps import apps
 from django.db import connection
+from django.contrib.auth import logout
 
 # Output directories
 RECORD_DIR = os.path.join(settings.MEDIA_ROOT, "recordings")
@@ -21,6 +22,11 @@ os.makedirs(PHOTO_DIR, exist_ok=True)
 # Global camera instance + lock
 camera_lock = threading.Lock()
 camera_instance = None
+
+
+def logout_view(request):
+    logout(request)
+    return redirect("login")
 
 def get_camera_settings():
     return CameraSettings.objects.first()
@@ -177,3 +183,4 @@ def settings_view(request):
         "form": form,
         "title": "Settings"
     })
+
