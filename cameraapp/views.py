@@ -31,7 +31,6 @@ camera_lock = threading.Lock()
 camera_instance = None
 
 
-
 def logout_view(request):
     logout(request)
     return redirect("login")
@@ -54,32 +53,22 @@ def get_camera_settings_safe():
 def reboot_pi(request):
     if request.method == "POST":
         print("[REBOOT] Executing system reboot...")
-
-        try:
-            # Direktes Aufrufen des Skripts (ohne sudo), falls korrekt gemounted
-            subprocess.Popen(["/usr/local/bin/reboot-host.sh"])
-        except FileNotFoundError as e:
-            print(f"[REBOOT ERROR] {e}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
+        subprocess.Popen(["/usr/local/bin/reboot-host.sh"])
         return render(request, "cameraapp/rebooting.html")
     return redirect("settings_view")
 
-
 def init_camera():
     global camera_instance
-    with camera_lock:
-        if camera_instance:
-            camera_instance.release()
-        camera_instance = cv2.VideoCapture(CAMERA_URL)
-        print(f"[CAM INIT] Opened camera from .env: {CAMERA_URL}")
-        if not camera_instance.isOpened():
-            print("[CAM INIT] Failed to open camera.")
-            camera_instance = None
+    if camera_instance:
+        camera_instance.release()
+    camera_instance = cv2.VideoCapture(CAMERA_URL)
+    print(f"[CAM INIT] Opened camera from .env: {CAMERA_URL}")
+    if not camera_instance.isOpened():
+        print("[CAM INIT] Failed to open camera.")
+        camera_instance = None
 
 def is_camera_open():
-    with camera_lock:
-        return camera_instance is not None and camera_instance.isOpened()
+    return camera_instance and camera_instance.isOpened()
 
 def read_frame():
     with camera_lock:
@@ -90,15 +79,16 @@ def read_frame():
 
 def gen_frames():
     print("[GEN_FRAMES] Start streaming loop.")
-    init_camera()
+    if not is_camera_open():
+        init_camera()
     settings_obj = get_camera_settings()
     overlay = settings_obj.overlay_timestamp if settings_obj else True
 
     while True:
         frame = read_frame()
         if frame is None:
-            print("[GEN_FRAMES] No frame, sleeping and retrying...")
-            time.sleep(2)
+            print("[GEN_FRAMES] No frame, sleeping 1s.")
+            time.sleep(1)
             continue
 
         if overlay:
