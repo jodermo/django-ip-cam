@@ -83,8 +83,11 @@
                 const match = src.match(/photo_(\d{8}_\d{6})/);
                 if (match) {
                     const rawTimestamp = match[1];
-                    const formatted = rawTimestamp.replace("_", " ").replace(/(\d{4})(\d{2})(\d{2})/, "$3.$2.$1");
-                    const timestamp = "⏱ " + formatted;
+                    const datePart = rawTimestamp.slice(0, 8);
+                    const timePart = rawTimestamp.slice(9, 15);
+                    const formattedDate = `${datePart.slice(6, 8)}.${datePart.slice(4, 6)}.${datePart.slice(0, 4)}`;
+                    const formattedTime = `${timePart.slice(0, 2)}:${timePart.slice(2, 4)}:${timePart.slice(4, 6)}`;
+                    const timestamp = `⏱ ${formattedDate} ${formattedTime}`;
 
                     ctx.font = "18px monospace";
                     ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
@@ -92,6 +95,7 @@
                     ctx.fillStyle = "white";
                     ctx.fillText(timestamp, 10, 22);
                 }
+
             };
             img.src = src;
         }

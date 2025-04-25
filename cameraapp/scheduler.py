@@ -1,19 +1,20 @@
+# scheduler.py
 import os
 import time
 import cv2
-from dotenv import load_dotenv
 from datetime import datetime
+from .models import CameraSettings
+from django.conf import settings
 
-load_dotenv()
-
-CAMERA_URL_RAW = os.getenv("CAMERA_URL")
-CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
-
-PHOTO_DIR = os.path.join("media", "photos")
+PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
 def take_photo():
-    cap = cv2.VideoCapture(CAMERA_URL)
+    settings_obj = CameraSettings.objects.first()
+    url = settings_obj.default_camera_url if settings_obj else "0"
+    camera_url = int(url) if url.isdigit() else url
+
+    cap = cv2.VideoCapture(camera_url)
     if not cap.isOpened():
         print("[PHOTO] Camera not available.")
         return
@@ -29,5 +30,10 @@ def take_photo():
 
 def start_photo_scheduler():
     while True:
-        take_photo()
-        time.sleep(15 * 60)  # alle 15 Minuten
+        settings_obj = CameraSettings.objects.first()
+        if settings_obj and settings_obj.timelapse_enabled:
+            take_photo()
+            interval = settings_obj.photo_interval_min
+        else:
+            interval = 15  # fallback
+        time.sleep(interval * 60)

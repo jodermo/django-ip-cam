@@ -1,27 +1,34 @@
+# views.py
 import os
 import cv2
 import time
 import threading
 from django.http import StreamingHttpResponse, HttpResponseServerError, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from dotenv import load_dotenv
 from django.conf import settings
+from django import forms
+from .models import CameraSettings
 
-# Load environment variables
-load_dotenv()
-
-# Parse CAMERA_URL from env
-CAMERA_URL_RAW = os.getenv("CAMERA_URL")
-CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
-
-# Output directory
-RECORD_DIR = os.path.join("media", "recordings")
+# Output directories
+RECORD_DIR = os.path.join(settings.MEDIA_ROOT, "recordings")
+PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(RECORD_DIR, exist_ok=True)
+os.makedirs(PHOTO_DIR, exist_ok=True)
 
 # Global camera instance + lock
 camera_lock = threading.Lock()
-camera_instance = cv2.VideoCapture(CAMERA_URL)
+camera_instance = None
+
+def get_camera_settings():
+    return CameraSettings.objects.first()
+
+def init_camera():
+    global camera_instance
+    settings_obj = get_camera_settings()
+    camera_url = settings_obj.default_camera_url if settings_obj else "0"
+    url = int(camera_url) if camera_url.isdigit() else camera_url
+    camera_instance = cv2.VideoCapture(url)
 
 def is_camera_open():
     return camera_instance and camera_instance.isOpened()
@@ -34,11 +41,21 @@ def read_frame():
         return frame if ret else None
 
 def gen_frames():
+    if not is_camera_open():
+        init_camera()
+    settings_obj = get_camera_settings()
+    overlay = settings_obj.overlay_timestamp if settings_obj else True
+    
     while True:
         frame = read_frame()
         if frame is None:
             time.sleep(1)
             continue
+
+        if overlay:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            cv2.putText(frame, timestamp, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
+
         ret, buffer = cv2.imencode(".jpg", frame)
         if not ret:
             continue
@@ -61,21 +78,26 @@ def video_feed(request):
 def stream_page(request):
     camera_error = None
     if not is_camera_open():
+        init_camera()
+    if not is_camera_open():
         camera_error = "Cannot open camera"
     return render(request, "cameraapp/stream.html", {"camera_error": camera_error})
 
 @login_required
 def record_video(request):
-    duration = int(request.GET.get("duration", 5))  # seconds
+    settings_obj = get_camera_settings()
+    default_duration = 5
+    duration = int(request.GET.get("duration", settings_obj.duration_sec if settings_obj else default_duration))
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     filename = f"clip_{timestamp}.mp4"
     filepath = os.path.join(RECORD_DIR, filename)
 
     with camera_lock:
         if not is_camera_open():
+            init_camera()
+        if not is_camera_open():
             return JsonResponse({"status": "error", "message": "Cannot open camera"}, status=500)
 
-        # Setup video writer
         fps = 20.0
         frame_width = int(camera_instance.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(camera_instance.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -93,15 +115,41 @@ def record_video(request):
 
     return JsonResponse({"status": "ok", "file": filepath})
 
-
 @login_required
 def photo_gallery(request):
-    photo_dir = os.path.join(settings.MEDIA_ROOT, "photos")
     photos = []
-
-    if os.path.exists(photo_dir):
-        for fname in sorted(os.listdir(photo_dir)):
+    if os.path.exists(PHOTO_DIR):
+        for fname in sorted(os.listdir(PHOTO_DIR)):
             if fname.lower().endswith((".jpg", ".jpeg", ".png")):
                 photos.append(f"/media/photos/{fname}")
 
-    return render(request, "cameraapp/gallery.html", {"photos": photos})
+    settings_obj = get_camera_settings()
+
+    return render(request, "cameraapp/gallery.html", {
+        "photos": photos,
+        "interval": settings_obj.interval_ms if settings_obj else 3000,
+        "duration": settings_obj.duration_sec if settings_obj else 30,
+        "autoplay": settings_obj.auto_play if settings_obj else False,
+        "overlay": settings_obj.overlay_timestamp if settings_obj else True,
+    })
+
+class CameraSettingsForm(forms.ModelForm):
+    class Meta:
+        model = CameraSettings
+        fields = "__all__"
+
+@login_required
+def settings_view(request):
+    settings_obj, _ = CameraSettings.objects.get_or_create(pk=1)
+
+    if request.method == "POST":
+        form = CameraSettingsForm(request.POST, instance=settings_obj)
+        if form.is_valid():
+            form.save()
+            return redirect("settings_view")
+    else:
+        form = CameraSettingsForm(instance=settings_obj)
+
+    return render(request, "cameraapp/settings.html", {"form": form})
+
+

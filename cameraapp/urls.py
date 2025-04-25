@@ -7,4 +7,5 @@ urlpatterns = [
     path("video_feed/", views.video_feed, name="video_feed"),
     path("record_video/", views.record_video, name="record_video"),
     path("gallery/", views.photo_gallery, name="photo_gallery"),
+    path("settings/", views.settings_view, name="settings_view"),
 ]
