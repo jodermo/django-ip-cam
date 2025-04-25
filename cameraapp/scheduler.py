@@ -1,6 +1,7 @@
 # scheduler.py
 import os
 import time
+import cv2
 from datetime import datetime
 from django.conf import settings
 from django.apps import apps
@@ -19,25 +20,23 @@ def get_camera_settings():
     return CameraSettings.objects.first()
 
 def take_photo():
-    """Nimmt ein Foto auf und speichert es mit Zeitstempel."""
-    with camera_lock:
-        if not is_camera_open():
-            init_camera()
+    """Unabhängige Aufnahme über eigene Kamera-Instanz."""
+    camera_url_raw = os.getenv("CAMERA_URL", "0")
+    camera_url = int(camera_url_raw) if camera_url_raw.isdigit() else camera_url_raw
 
-        frame = read_frame()
-        if frame is None:
-            print("[PHOTO] Fehler: Kein Bild aufgenommen.")
-            return
-
+    cap = cv2.VideoCapture(camera_url)
+    if not cap.isOpened():
+        print("[PHOTO] Camera not available.")
+        return
+    ret, frame = cap.read()
+    if ret:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"photo_{timestamp}.jpg"
-        filepath = os.path.join(PHOTO_DIR, filename)
-        success = cv2.imwrite(filepath, frame)
-
-        if success:
-            print(f"[PHOTO] Gespeichert: {filepath}")
-        else:
-            print(f"[PHOTO] Fehler beim Speichern von: {filepath}")
+        path = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
+        cv2.imwrite(path, frame)
+        print(f"[PHOTO] Saved: {path}")
+    else:
+        print("[PHOTO] Failed to capture.")
+    cap.release()
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
     """Wartet darauf, dass die Datenbanktabelle verfügbar ist (z. B. nach Container-Start)."""
