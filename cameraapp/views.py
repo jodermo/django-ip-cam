@@ -12,6 +12,8 @@ from .models import CameraSettings
 from django.apps import apps
 from django.db import connection
 from django.contrib.auth import logout
+import subprocess
+from django.views.decorators.csrf import csrf_exempt
 
 # Output directories
 RECORD_DIR = os.path.join(settings.MEDIA_ROOT, "recordings")
@@ -40,6 +42,15 @@ def get_camera_settings_safe():
 
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
+
+@login_required
+@csrf_exempt
+def reboot_pi(request):
+    if request.method == "POST":
+        print("[REBOOT] Rebooting Raspberry Pi now...")
+        subprocess.Popen(["sudo", "reboot"])
+        return render(request, "cameraapp/rebooting.html")
+    return redirect("settings_view")
 
 def init_camera():
     global camera_instance

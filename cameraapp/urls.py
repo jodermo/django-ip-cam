@@ -9,4 +9,5 @@ urlpatterns = [
     path("gallery/", views.photo_gallery, name="photo_gallery"),
     path("settings/", views.settings_view, name="settings_view"),
     path("accounts/logout/", views.logout_view, name="logout"),
+    path("reboot/", views.reboot_pi, name="reboot_pi"),
 ]
