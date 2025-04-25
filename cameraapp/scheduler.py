@@ -37,6 +37,7 @@ def take_photo():
     else:
         print("[PHOTO] Failed to capture.")
     cap.release()
+    init_camera()
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
     """Wartet darauf, dass die Datenbanktabelle verfügbar ist (z. B. nach Container-Start)."""

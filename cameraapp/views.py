@@ -19,7 +19,6 @@ load_dotenv()
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
 CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
-camera_instance = cv2.VideoCapture(CAMERA_URL)
 
 # Output directories
 RECORD_DIR = os.path.join(settings.MEDIA_ROOT, "recordings")
@@ -60,13 +59,13 @@ def reboot_pi(request):
 
 def init_camera():
     global camera_instance
+    if camera_instance:
+        camera_instance.release()
     camera_instance = cv2.VideoCapture(CAMERA_URL)
     print(f"[CAM INIT] Opened camera from .env: {CAMERA_URL}")
     if not camera_instance.isOpened():
         print("[CAM INIT] Failed to open camera.")
         camera_instance = None
-
-
 
 def is_camera_open():
     return camera_instance and camera_instance.isOpened()
@@ -106,7 +105,6 @@ def gen_frames():
             b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
         )
 
-
 @login_required
 def video_feed(request):
     try:
@@ -137,7 +135,6 @@ def stream_page(request):
         "camera_error": camera_error,
         "title": "Live Stream"
     })
-
 
 @login_required
 def record_video(request):
@@ -215,4 +212,3 @@ def settings_view(request):
         "form": form,
         "title": "Settings"
     })
-
