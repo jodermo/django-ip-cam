@@ -47,8 +47,8 @@ def get_camera_settings_safe():
 @csrf_exempt
 def reboot_pi(request):
     if request.method == "POST":
-        print("[REBOOT] Rebooting Raspberry Pi now...")
-        subprocess.Popen(["sudo", "reboot"])
+        print("[REBOOT] Executing system reboot...")
+        subprocess.Popen(["/usr/local/bin/reboot-host.sh"])
         return render(request, "cameraapp/rebooting.html")
     return redirect("settings_view")
 
