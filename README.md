@@ -29,6 +29,7 @@ pi
 
 your_user_name ALL=(ALL) NOPASSWD: /usr/sbin/reboot
 ```bash
+chmod +x scripts/reboot-host.sh
 sudo visudo
 pi ALL=(ALL) NOPASSWD: /usr/sbin/reboot
 ```

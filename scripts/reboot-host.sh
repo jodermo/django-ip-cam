@@ -1,2 +1,3 @@
 #!/bin/bash
-sudo /sbin/reboot
+echo "[REBOOT SCRIPT] Rebooting the system..."
+/sbin/reboot
