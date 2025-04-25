@@ -96,7 +96,7 @@ def stream_page(request):
     elif settings_obj is None:
         camera_error = "Settings not ready (DB table missing?)"
 
-    return render(request, "cameraapp/stream.html", {
+    return render(request, "template/cameraapp/stream.html", {
         "camera_error": camera_error,
         "title": "Live Stream"
     })
@@ -147,7 +147,7 @@ def photo_gallery(request):
 
     settings_obj = get_camera_settings()
 
-    return render(request, "cameraapp/gallery.html", {
+    return render(request, "template/cameraapp/gallery.html", {
         "photos": photos,
         "interval": settings_obj.interval_ms if settings_obj else 3000,
         "duration": settings_obj.duration_sec if settings_obj else 30,
@@ -173,7 +173,7 @@ def settings_view(request):
     else:
         form = CameraSettingsForm(instance=settings_obj)
 
-    return render(request, "cameraapp/settings.html", {
+    return render(request, "template/cameraapp/settings.html", {
         "form": form,
         "title": "Settings"
     })
