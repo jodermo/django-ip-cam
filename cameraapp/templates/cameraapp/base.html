@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}IPCam Dashboard{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, sans-serif;
+            background: #f4f4f4;
+        }
+
+        header {
+            background-color: #222;
+            color: #fff;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        nav a {
+            color: white;
+            margin-right: 15px;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        footer {
+            text-align: center;
+            padding: 15px;
+            background-color: #222;
+            color: #999;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div><strong>IPCam</strong> Control Panel</div>
+    <nav>
+        <a href="{% url 'stream_page' %}">Live Stream</a>
+        <a href="{% url 'photo_gallery' %}">Gallery</a>
+        <a href="{% url 'settings_view' %}">Settings</a>
+        <a href="{% url 'logout' %}">Logout</a>
+    </nav>
+</header>
+
+<div class="container">
+    {% block content %}{% endblock %}
+</div>
+
+<footer>
+    &copy; {{ now|default:2025 }} IPCam Viewer | Powered by Django
+</footer>
+
+</body>
+</html>

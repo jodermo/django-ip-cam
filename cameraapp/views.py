@@ -25,9 +25,7 @@ camera_instance = None
 def get_camera_settings():
     return CameraSettings.objects.first()
 
-
 def get_camera_settings_safe():
-    # Verhindert Zugriff, wenn Tabelle noch nicht existiert
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1 FROM cameraapp_camerasettings LIMIT 1")
@@ -59,7 +57,7 @@ def gen_frames():
         init_camera()
     settings_obj = get_camera_settings()
     overlay = settings_obj.overlay_timestamp if settings_obj else True
-    
+
     while True:
         frame = read_frame()
         if frame is None:
@@ -68,7 +66,7 @@ def gen_frames():
 
         if overlay:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            cv2.putText(frame, timestamp, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
+            cv2.putText(frame, timestamp, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
         ret, buffer = cv2.imencode(".jpg", frame)
         if not ret:
@@ -98,14 +96,20 @@ def stream_page(request):
     elif settings_obj is None:
         camera_error = "Settings not ready (DB table missing?)"
 
-    return render(request, "cameraapp/stream.html", {"camera_error": camera_error})
-
+    return render(request, "cameraapp/stream.html", {
+        "camera_error": camera_error,
+        "title": "Live Stream"
+    })
 
 @login_required
 def record_video(request):
     settings_obj = get_camera_settings()
     default_duration = 5
+    default_fps = 20.0
+
     duration = int(request.GET.get("duration", settings_obj.duration_sec if settings_obj else default_duration))
+    fps = float(request.GET.get("fps", settings_obj.record_fps if settings_obj and settings_obj.record_fps else default_fps))
+
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     filename = f"clip_{timestamp}.mp4"
     filepath = os.path.join(RECORD_DIR, filename)
@@ -116,7 +120,6 @@ def record_video(request):
         if not is_camera_open():
             return JsonResponse({"status": "error", "message": "Cannot open camera"}, status=500)
 
-        fps = 20.0
         frame_width = int(camera_instance.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(camera_instance.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -149,6 +152,7 @@ def photo_gallery(request):
         "duration": settings_obj.duration_sec if settings_obj else 30,
         "autoplay": settings_obj.auto_play if settings_obj else False,
         "overlay": settings_obj.overlay_timestamp if settings_obj else True,
+        "title": "Gallery"
     })
 
 class CameraSettingsForm(forms.ModelForm):
@@ -168,6 +172,7 @@ def settings_view(request):
     else:
         form = CameraSettingsForm(instance=settings_obj)
 
-    return render(request, "cameraapp/settings.html", {"form": form})
-
-
+    return render(request, "cameraapp/settings.html", {
+        "form": form,
+        "title": "Settings"
+    })
