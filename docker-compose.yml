@@ -14,7 +14,7 @@ services:
       - ./static:/app/static
       - static_volume:/app/staticfiles
       - ./templates:/app/templates
-      - ./scripts/reboot-host.sh:/usr/local/bin/reboot-host.sh
+      - /usr/local/bin/reboot-host.sh:/usr/local/bin/reboot-host.sh:ro
     devices:
       - /dev/video0:/dev/video0
       - /dev/video1:/dev/video1
