@@ -109,6 +109,9 @@ def record_video(request):
 
     duration = int(request.GET.get("duration", settings_obj.duration_sec if settings_obj else default_duration))
     fps = float(request.GET.get("fps", settings_obj.record_fps if settings_obj and settings_obj.record_fps else default_fps))
+    resolution_w = int(request.GET.get("width", settings_obj.resolution_width if settings_obj and settings_obj.resolution_width else 640))
+    resolution_h = int(request.GET.get("height", settings_obj.resolution_height if settings_obj and settings_obj.resolution_height else 480))
+    codec = request.GET.get("codec", settings_obj.video_codec if settings_obj and settings_obj.video_codec else "mp4v")
 
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     filename = f"clip_{timestamp}.mp4"
@@ -120,17 +123,15 @@ def record_video(request):
         if not is_camera_open():
             return JsonResponse({"status": "error", "message": "Cannot open camera"}, status=500)
 
-        frame_width = int(camera_instance.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(camera_instance.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(filepath, fourcc, fps, (frame_width, frame_height))
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        out = cv2.VideoWriter(filepath, fourcc, fps, (resolution_w, resolution_h))
 
         start = time.time()
         while time.time() - start < duration:
             frame = read_frame()
             if frame is None:
                 break
-            out.write(frame)
+            out.write(cv2.resize(frame, (resolution_w, resolution_h)))
 
         out.release()
 
