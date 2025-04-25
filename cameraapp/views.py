@@ -59,13 +59,14 @@ def reboot_pi(request):
 
 def init_camera():
     global camera_instance
-    if camera_instance:
-        camera_instance.release()
-    camera_instance = cv2.VideoCapture(CAMERA_URL)
-    print(f"[CAM INIT] Opened camera from .env: {CAMERA_URL}")
-    if not camera_instance.isOpened():
-        print("[CAM INIT] Failed to open camera.")
-        camera_instance = None
+    with camera_lock:
+        if camera_instance:
+            camera_instance.release()
+        camera_instance = cv2.VideoCapture(CAMERA_URL)
+        print(f"[CAM INIT] Opened camera from .env: {CAMERA_URL}")
+        if not camera_instance.isOpened():
+            print("[CAM INIT] Failed to open camera.")
+            camera_instance = None
 
 def is_camera_open():
     return camera_instance and camera_instance.isOpened()
@@ -87,7 +88,8 @@ def gen_frames():
     while True:
         frame = read_frame()
         if frame is None:
-            print("[GEN_FRAMES] No frame, sleeping 1s.")
+            print("[GEN_FRAMES] No frame, reinitializing camera.")
+            init_camera()
             time.sleep(1)
             continue
 
