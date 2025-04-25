@@ -75,6 +75,7 @@ def read_frame():
         return frame if ret else None
 
 def gen_frames():
+    print("[GEN_FRAMES] Start streaming loop.")
     if not is_camera_open():
         init_camera()
     settings_obj = get_camera_settings()
@@ -83,6 +84,7 @@ def gen_frames():
     while True:
         frame = read_frame()
         if frame is None:
+            print("[GEN_FRAMES] No frame, sleeping 1s.")
             time.sleep(1)
             continue
 
@@ -92,11 +94,14 @@ def gen_frames():
 
         ret, buffer = cv2.imencode(".jpg", frame)
         if not ret:
+            print("[GEN_FRAMES] Encoding failed.")
             continue
+
         yield (
             b"--frame\r\n"
             b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
         )
+
 
 @login_required
 def video_feed(request):
