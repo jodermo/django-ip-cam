@@ -46,5 +46,10 @@ services:
     volumes:
       - .:/app
 
+  services:
+    django_ipcam_web:
+      volumes:
+        - /usr/local/bin/reboot-host.sh:/usr/local/bin/reboot-host.sh:ro
+
 volumes:
   static_volume:

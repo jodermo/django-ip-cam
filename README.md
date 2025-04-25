@@ -31,8 +31,31 @@ your_user_name ALL=(ALL) NOPASSWD: /usr/sbin/reboot
 ```bash
 chmod +x scripts/reboot-host.sh
 sudo visudo
+your-server-name ALL=(ALL) NOPASSWD: /sbin/reboot
 your-server-name ALL=(ALL) NOPASSWD: /usr/sbin/reboot
+your-server-name ALL=(ALL) NOPASSWD: /usr/local/bin/reboot-host.sh
 www-data ALL=(ALL) NOPASSWD: /usr/local/bin/reboot-server
+
+
+
+
+
+
+
+
+# run:
+sudo nano /usr/local/bin/reboot-host.sh
+
+# add:
+
+#!/bin/bash
+echo "[REBOOT SCRIPT] Rebooting the host..."
+/sbin/reboot
+
+# run:
+sudo chmod +x /usr/local/bin/reboot-host.sh
+
+
 ```
 
 1. Clone the repository:

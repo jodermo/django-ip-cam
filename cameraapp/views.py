@@ -54,10 +54,17 @@ def get_camera_settings_safe():
 def reboot_pi(request):
     if request.method == "POST":
         print("[REBOOT] Executing system reboot...")
-        subprocess.Popen(["sudo", "/usr/local/bin/reboot-host.sh"])
-        # subprocess.Popen(["sudo", "/usr/local/bin/reboot-server"])
+
+        try:
+            # Direktes Aufrufen des Skripts (ohne sudo), falls korrekt gemounted
+            subprocess.Popen(["/usr/local/bin/reboot-host.sh"])
+        except FileNotFoundError as e:
+            print(f"[REBOOT ERROR] {e}")
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
         return render(request, "cameraapp/rebooting.html")
     return redirect("settings_view")
+
 
 def init_camera():
     global camera_instance
