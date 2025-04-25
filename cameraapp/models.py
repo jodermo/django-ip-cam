@@ -9,7 +9,7 @@ class Camera(models.Model):
         return self.name
 
 class CameraSettings(models.Model):
-    # Slideshow
+    # Slideshow / Stream
     interval_ms = models.PositiveIntegerField(default=3000)
     duration_sec = models.PositiveIntegerField(default=30)
     overlay_timestamp = models.BooleanField(default=True)
@@ -20,11 +20,15 @@ class CameraSettings(models.Model):
     photo_interval_min = models.PositiveIntegerField(default=15)
     timelapse_enabled = models.BooleanField(default=True)
 
-    # Recording
+    # Aufnahmeoptionen
     record_fps = models.FloatField(default=20.0)
     resolution_width = models.PositiveIntegerField(default=640)
     resolution_height = models.PositiveIntegerField(default=480)
-    video_codec = models.CharField(max_length=10, default="mp4v")  # z. B. "mp4v", "XVID", "MJPG"
+    video_codec = models.CharField(max_length=10, default="mp4v")  # z. B. 'mp4v', 'XVID', 'MJPG'
+
+    # Foto-Optionen
+    photo_quality = models.PositiveIntegerField(default=95)  # JPEG Qualität (1-100)
+    save_raw_photos = models.BooleanField(default=False)     # Speichert auch RAW-Bilder
 
     def __str__(self):
         return "Global Camera Settings"
