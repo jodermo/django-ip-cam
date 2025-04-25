@@ -14,6 +14,12 @@ from django.db import connection
 from django.contrib.auth import logout
 import subprocess
 from django.views.decorators.csrf import csrf_exempt
+from dotenv import load_dotenv
+load_dotenv()
+
+CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
+CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
+camera_instance = cv2.VideoCapture(CAMERA_URL)
 
 # Output directories
 RECORD_DIR = os.path.join(settings.MEDIA_ROOT, "recordings")
@@ -54,14 +60,12 @@ def reboot_pi(request):
 
 def init_camera():
     global camera_instance
-    settings_obj = get_camera_settings()
-    camera_url = settings_obj.default_camera_url if settings_obj else "0"
-    url = int(camera_url) if str(camera_url).isdigit() else camera_url
-
-    print(f"[CAM INIT] Trying to open camera: {url}")
-    camera_instance = cv2.VideoCapture(url)
+    camera_instance = cv2.VideoCapture(CAMERA_URL)
+    print(f"[CAM INIT] Opened camera from .env: {CAMERA_URL}")
     if not camera_instance.isOpened():
         print("[CAM INIT] Failed to open camera.")
+        camera_instance = None
+
 
 
 def is_camera_open():
