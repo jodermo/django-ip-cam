@@ -11,6 +11,7 @@ services:
       - .env
     volumes:
       - .:/app
+      - ./static:/app/static
       - static_volume:/app/staticfiles
       - ./templates:/app/templates
     devices:
