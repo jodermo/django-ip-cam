@@ -1,8 +1,8 @@
 from django.urls import path
-from .views import record_video
+from . import views
 
 urlpatterns = [
     path("", views.stream_page, name="stream_page"),
     path("video_feed/", views.video_feed, name="video_feed"),
-    path("record_video/", record_video, name="record_video"),
+    path("record_video/", views.record_video, name="record_video"),
 ]
