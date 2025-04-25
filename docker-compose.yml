@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    container_name: django_ipcam_web
+    command: gunicorn ipcam_project.wsgi:application --bind 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+    depends_on:
+      - migrate
+
+  migrate:
+    build: .
+    command: python manage.py migrate
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+
+volumes:
+  static_volume:
