@@ -31,6 +31,7 @@ camera_lock = threading.Lock()
 camera_instance = None
 
 
+
 def logout_view(request):
     logout(request)
     return redirect("login")
@@ -69,7 +70,8 @@ def init_camera():
             camera_instance = None
 
 def is_camera_open():
-    return camera_instance and camera_instance.isOpened()
+    with camera_lock:
+        return camera_instance is not None and camera_instance.isOpened()
 
 def read_frame():
     with camera_lock:
@@ -80,17 +82,15 @@ def read_frame():
 
 def gen_frames():
     print("[GEN_FRAMES] Start streaming loop.")
-    if not is_camera_open():
-        init_camera()
+    init_camera()
     settings_obj = get_camera_settings()
     overlay = settings_obj.overlay_timestamp if settings_obj else True
 
     while True:
         frame = read_frame()
         if frame is None:
-            print("[GEN_FRAMES] No frame, reinitializing camera.")
-            init_camera()
-            time.sleep(1)
+            print("[GEN_FRAMES] No frame, sleeping and retrying...")
+            time.sleep(2)
             continue
 
         if overlay:

@@ -27,6 +27,12 @@ pi
 
 ## Installation
 
+your_user_name ALL=(ALL) NOPASSWD: /usr/sbin/reboot
+```bash
+sudo visudo
+pi ALL=(ALL) NOPASSWD: /usr/sbin/reboot
+```
+
 1. Clone the repository:
 
     ```bash

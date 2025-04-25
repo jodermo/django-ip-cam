@@ -19,13 +19,18 @@
     RUN pip install --upgrade pip
     RUN pip install --no-cache-dir -r requirements.txt
     RUN pip install gunicorn gevent
-    
+
     # --- Copy project files ---
     COPY . .
     
     # --- Collect static files ---
     RUN python manage.py collectstatic --noinput
- 
+
+    # --- Copy reboot-host.sh ---
+
+    COPY scripts/reboot-host.sh /usr/local/bin/reboot-host.sh
+    RUN chmod +x /usr/local/bin/reboot-host.sh
+
     # --- Expose port ---
     EXPOSE 8000
     
