@@ -12,6 +12,7 @@ services:
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
+      - ./templates:/app/templates
     devices:
       - /dev/video0:/dev/video0
     privileged: true
