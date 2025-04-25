@@ -54,7 +54,8 @@ def get_camera_settings_safe():
 def reboot_pi(request):
     if request.method == "POST":
         print("[REBOOT] Executing system reboot...")
-        subprocess.Popen(["/usr/local/bin/reboot-host.sh"])
+        subprocess.Popen(["sudo", "/usr/local/bin/reboot-host.sh"])
+        # subprocess.Popen(["sudo", "/usr/local/bin/reboot-server"])
         return render(request, "cameraapp/rebooting.html")
     return redirect("settings_view")
 
