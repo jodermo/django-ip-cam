@@ -176,3 +176,28 @@ django-ip-cam/
 └── .dockerignore                Ignore rules during Docker build (like .env and staticfiles)
 
 ```
+
+
+start cert bot for the first time
+```bash
+docker-compose run --rm certbot
+```
+
+run nginx 
+```bash
+docker-compose up -d nginx django
+```
+
+restart nginx 
+```bash
+docker-compose restart nginx
+```
+stop nginx 
+```bash
+docker-compose stop nginx
+```
+
+Renew cert
+```bash
+docker-compose run --rm certbot renew
+```
