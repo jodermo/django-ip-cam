@@ -2,9 +2,11 @@
 import os
 import time
 import cv2
+import sqlite3
 from datetime import datetime
 from django.conf import settings
 from django.apps import apps
+from django.db import connections
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
@@ -32,8 +34,19 @@ def take_photo():
         print("[PHOTO] Failed to capture.")
     cap.release()
 
+def wait_for_table(table_name, db_alias="default", timeout=30):
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            with connections[db_alias].cursor() as cursor:
+                cursor.execute(f"SELECT 1 FROM {table_name} LIMIT 1")
+            return
+        except Exception:
+            time.sleep(1)
+    print(f"[ERROR] Timeout: Table {table_name} not available after {timeout} seconds.")
+
 def start_photo_scheduler():
-    time.sleep(10)  # give migrations time to complete
+    wait_for_table("cameraapp_camerasettings")
     while True:
         settings_obj = get_camera_settings()
         if settings_obj and settings_obj.timelapse_enabled:
