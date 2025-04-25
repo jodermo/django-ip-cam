@@ -1,12 +1,12 @@
 import os
-from django.core.asgi import get_asgi_application
+from django.core.wsgi import get_wsgi_application
 from dotenv import load_dotenv
 
-# .env-Datei laden
+# Load environment variables from .env
 load_dotenv()
 
-# Django-Einstellungen setzen
+# Set the settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ipcam_project.settings')
 
-# ASGI-Anwendung laden
-application = get_asgi_application()
+# WSGI application for Gunicorn and production
+application = get_wsgi_application()

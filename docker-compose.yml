@@ -12,6 +12,9 @@ services:
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
+    devices:
+      - /dev/video0:/dev/video0
+    privileged: true
     depends_on:
       - migrate
 

@@ -9,5 +9,11 @@
     <p>Angemeldet als: {{ request.user.username }}</p>
     <img src="{% url 'video_feed' %}" width="640" height="480" alt="Live Stream">
     <p><a href="{% url 'logout' %}">Logout</a></p>
+    {% if camera_error %}
+    <p style="color: red;">Error: {{ camera_error }}</p>
+    {% else %}
+    <img src="{% url 'video_feed' %}" width="640" height="480" alt="Live Stream">
+    {% endif %}
+
 </body>
 </html>
