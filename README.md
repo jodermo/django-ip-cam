@@ -31,7 +31,8 @@ your_user_name ALL=(ALL) NOPASSWD: /usr/sbin/reboot
 ```bash
 chmod +x scripts/reboot-host.sh
 sudo visudo
-pi ALL=(ALL) NOPASSWD: /usr/sbin/reboot
+your-server-name ALL=(ALL) NOPASSWD: /usr/sbin/reboot
+www-data ALL=(ALL) NOPASSWD: /usr/local/bin/reboot-server
 ```
 
 1. Clone the repository:
