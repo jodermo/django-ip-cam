@@ -23,7 +23,8 @@ services:
     privileged: true
     depends_on:
       - migrate
-
+    restart: unless-stopped
+    
   migrate:
     build: .
     command: python manage.py migrate
@@ -31,7 +32,7 @@ services:
       - .env
     volumes:
       - .:/app
-    restart: unless-stopped
+
 
 volumes:
   static_volume:
