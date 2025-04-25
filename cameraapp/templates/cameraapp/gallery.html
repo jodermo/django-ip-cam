@@ -10,19 +10,38 @@
         }
         .controls {
             text-align: center;
+            margin-bottom: 10px;
         }
         button {
             margin: 5px;
+        }
+        .slider-container {
+            text-align: center;
+            margin-top: 10px;
+        }
+        label {
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
     <h2 style="text-align:center;">Saved Photos</h2>
     <canvas id="photoCanvas" width="640" height="480"></canvas>
+
     <div class="controls">
         <button onclick="prevImage()">Previous</button>
         <button onclick="togglePlayPause()" id="playPauseBtn">Play</button>
         <button onclick="nextImage()">Next</button>
+    </div>
+
+    <div class="slider-container">
+        <label>Interval (ms): <span id="speedValue">3000</span></label><br>
+        <input type="range" id="speedRange" min="500" max="10000" step="500" value="3000" onchange="updateSpeed()">
+    </div>
+
+    <div class="slider-container">
+        <label>Duration (sec): <span id="durationValue">30</span></label><br>
+        <input type="range" id="durationRange" min="5" max="300" step="5" value="30" onchange="updateDuration()">
     </div>
 
     <script>
@@ -30,15 +49,35 @@
         let index = 0;
         let playing = false;
         let intervalId = null;
+        let stopTimeoutId = null;
+        let intervalMs = 3000;
+        let durationSec = 30;
 
         const canvas = document.getElementById("photoCanvas");
         const ctx = canvas.getContext("2d");
+        const speedSlider = document.getElementById("speedRange");
+        const speedLabel = document.getElementById("speedValue");
+        const durationSlider = document.getElementById("durationRange");
+        const durationLabel = document.getElementById("durationValue");
 
         function loadImage(src) {
             const img = new Image();
             img.onload = () => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                const match = src.match(/photo_(\d{8}_\d{6})/);
+                if (match) {
+                    const rawTimestamp = match[1];
+                    const formatted = rawTimestamp.replace("_", " ").replace(/(\d{4})(\d{2})(\d{2})/, "$3.$2.$1");
+                    const timestamp = "⏱ " + formatted;
+
+                    ctx.font = "18px monospace";
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+                    ctx.fillRect(0, 0, canvas.width, 30);
+                    ctx.fillStyle = "white";
+                    ctx.fillText(timestamp, 10, 22);
+                }
             };
             img.src = src;
         }
@@ -63,10 +102,29 @@
             document.getElementById("playPauseBtn").textContent = playing ? "Pause" : "Play";
 
             if (playing) {
-                intervalId = setInterval(nextImage, 3000); // alle 3 Sekunden
+                intervalId = setInterval(nextImage, intervalMs);
+                stopTimeoutId = setTimeout(() => {
+                    togglePlayPause();
+                }, durationSec * 1000);
             } else {
                 clearInterval(intervalId);
+                clearTimeout(stopTimeoutId);
             }
+        }
+
+        function updateSpeed() {
+            intervalMs = parseInt(speedSlider.value);
+            speedLabel.textContent = intervalMs;
+
+            if (playing) {
+                clearInterval(intervalId);
+                intervalId = setInterval(nextImage, intervalMs);
+            }
+        }
+
+        function updateDuration() {
+            durationSec = parseInt(durationSlider.value);
+            durationLabel.textContent = durationSec;
         }
 
         // Initiales Bild laden
