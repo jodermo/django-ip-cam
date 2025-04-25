@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Photo Gallery</title>
+    <style>
+        canvas {
+            border: 2px solid #333;
+            display: block;
+            margin: 20px auto;
+        }
+        .controls {
+            text-align: center;
+        }
+        button {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h2 style="text-align:center;">Saved Photos</h2>
+    <canvas id="photoCanvas" width="640" height="480"></canvas>
+    <div class="controls">
+        <button onclick="prevImage()">Previous</button>
+        <button onclick="togglePlayPause()" id="playPauseBtn">Play</button>
+        <button onclick="nextImage()">Next</button>
+    </div>
+
+    <script>
+        const photos = {{ photos|safe }};
+        let index = 0;
+        let playing = false;
+        let intervalId = null;
+
+        const canvas = document.getElementById("photoCanvas");
+        const ctx = canvas.getContext("2d");
+
+        function loadImage(src) {
+            const img = new Image();
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
+            img.src = src;
+        }
+
+        function showImage(i) {
+            if (photos.length > 0) {
+                index = (i + photos.length) % photos.length;
+                loadImage(photos[index]);
+            }
+        }
+
+        function nextImage() {
+            showImage(index + 1);
+        }
+
+        function prevImage() {
+            showImage(index - 1);
+        }
+
+        function togglePlayPause() {
+            playing = !playing;
+            document.getElementById("playPauseBtn").textContent = playing ? "Pause" : "Play";
+
+            if (playing) {
+                intervalId = setInterval(nextImage, 3000); // alle 3 Sekunden
+            } else {
+                clearInterval(intervalId);
+            }
+        }
+
+        // Initiales Bild laden
+        if (photos.length > 0) {
+            loadImage(photos[0]);
+        }
+    </script>
+</body>
+</html>

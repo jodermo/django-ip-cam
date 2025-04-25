@@ -6,6 +6,7 @@ from django.http import StreamingHttpResponse, HttpResponseServerError, JsonResp
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from dotenv import load_dotenv
+from django.conf import settings
 
 # Load environment variables
 load_dotenv()
@@ -91,3 +92,16 @@ def record_video(request):
         out.release()
 
     return JsonResponse({"status": "ok", "file": filepath})
+
+
+@login_required
+def photo_gallery(request):
+    photo_dir = os.path.join(settings.MEDIA_ROOT, "photos")
+    photos = []
+
+    if os.path.exists(photo_dir):
+        for fname in sorted(os.listdir(photo_dir)):
+            if fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                photos.append(f"/media/photos/{fname}")
+
+    return render(request, "cameraapp/gallery.html", {"photos": photos})
