@@ -54,12 +54,6 @@ last_disconnect_time = None
 recording_job = None
 recording_timeout = 30
 
-# Stream Job
-globals()["livestream_job"] = LiveStreamJob(
-    camera_url=CAMERA_URL,
-    frame_callback=lambda f: update_latest_frame(f)
-)
-
 
 def update_latest_frame(frame):
     global latest_frame
