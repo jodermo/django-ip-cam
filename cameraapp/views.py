@@ -19,10 +19,15 @@ from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from .recording_job import RecordingJob
-
+from .livestream_job import LiveStreamJob
 
 from dotenv import load_dotenv
 load_dotenv()
+
+livestream_job = LiveStreamJob(
+    camera_source=CAMERA_URL,
+    frame_callback=lambda f: update_latest_frame(f)  # zum Teilen mit Recorder
+)
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
 CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
@@ -65,6 +70,11 @@ def get_camera_settings_safe():
 
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
+
+def update_latest_frame(frame):
+    global latest_frame
+    with latest_frame_lock:
+        latest_frame = frame.copy()
 
 
 @login_required
@@ -178,20 +188,24 @@ def delayed_camera_release():
                 camera_instance = None  # <--- Wichtig
 
 
-
 @login_required
 def video_feed(request):
-    with camera_lock:
-        if not is_camera_open():
-            print("[VIDEO_FEED] Camera not open. Trying to initialize...")
-            init_camera()
-    try:
-        return StreamingHttpResponse(
-            gen_frames(),
-            content_type="multipart/x-mixed-replace; boundary=frame"
-        )
-    except Exception as e:
-        return HttpResponseServerError(f"Camera error: {e}")
+    if not livestream_job.running:
+        livestream_job.start()
+
+    def frame_generator():
+        while True:
+            frame = livestream_job.get_frame()
+            if frame is None:
+                time.sleep(0.1)
+                continue
+            _, buffer = cv2.imencode(".jpg", frame)
+            yield (b"--frame\r\n"
+                   b"Content-Type: image/jpeg\r\n\r\n" +
+                   buffer.tobytes() + b"\r\n")
+    return StreamingHttpResponse(frame_generator(),
+        content_type="multipart/x-mixed-replace; boundary=frame")
+
 
 
 @login_required
