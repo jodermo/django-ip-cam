@@ -6,12 +6,14 @@ class CameraappConfig(AppConfig):
     name = 'cameraapp'
 
     def ready(self):
-        # Optional: only if signals.py exists
         try:
             import cameraapp.signals
         except ImportError:
             pass
 
-        # Start background photo scheduler
-        from .scheduler import start_photo_scheduler
-        threading.Thread(target=start_photo_scheduler, daemon=True).start()
+        def start_safe():
+            from .scheduler import wait_for_table, start_photo_scheduler
+            wait_for_table("cameraapp_camerasettings")
+            start_photo_scheduler()
+
+        threading.Thread(target=start_safe, daemon=True).start()

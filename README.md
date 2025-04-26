@@ -222,7 +222,7 @@ docker-compose run --rm certbot renew
 
 
 ```bash
-docker-compose exec web python manage.py makemigrations
-docker-compose exec web python manage.py migrate
+docker-compose exec django python manage.py makemigrations
+docker-compose exec django python manage.py migrate
 
 ```

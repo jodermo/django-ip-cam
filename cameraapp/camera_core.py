@@ -28,10 +28,6 @@ def try_open_camera(source, retries=3, delay=1.5):
     print("[CAMERA] Failed to open camera after retries.")
     return None
 
-
-
-
-
 def init_camera():
     """Initialisiert die globale Kamera-Instanz mit gespeicherten Video-Settings."""
     global camera_instance
