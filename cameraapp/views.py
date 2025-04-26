@@ -362,7 +362,21 @@ def take_photo_now(request):
     with camera_lock:
         pause_livestream()
         try:
-            take_photo()
+            success = take_photo()
+            if not success:
+                return JsonResponse({"status": "Kamera konnte nicht geöffnet werden."}, status=500)
         finally:
             resume_livestream()
     return JsonResponse({"status": "ok"})
+
+
+@require_POST
+@login_required
+def auto_photo_settings(request):
+    settings = get_camera_settings()
+    if settings:
+        from .camera_core import init_camera, apply_auto_settings
+        apply_auto_settings(settings)
+        init_camera()
+        return JsonResponse({"status": "auto settings applied"})
+    return JsonResponse({"status": "error"}, status=500)

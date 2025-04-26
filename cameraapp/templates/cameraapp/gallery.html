@@ -88,7 +88,10 @@
                 headers: { 'X-CSRFToken': '{{ csrf_token }}' }
             })
             .then(response => response.json())
-            .then(data => alert(data.status || "Foto aufgenommen"))
+            .then(data => {
+                alert(data.status || "Foto aufgenommen");
+                location.reload();
+            })
             .catch(err => alert("Fehler beim Auslösen: " + err));
         }
         function loadImage(src) {

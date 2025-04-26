@@ -41,6 +41,7 @@ def take_photo():
         print("[PHOTO] Fehler beim Erfassen des Bildes.")
 
     cap.release()
+    return True
 
 def apply_camera_settings(cap, settings, mode="video"):
     if settings is None or not cap.isOpened():
