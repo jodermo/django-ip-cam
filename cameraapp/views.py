@@ -378,6 +378,7 @@ def record_video(request):
 @login_required
 def start_recording(request):
     print("[DEBUG] start_recording view triggered")
+    return JsonResponse({"status": "debug ok"})  # testweise
     global recording_thread, recording_active
 
     settings_obj = get_camera_settings()
