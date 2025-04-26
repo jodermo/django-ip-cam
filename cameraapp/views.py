@@ -155,6 +155,10 @@ def delayed_camera_release():
 
 @login_required
 def video_feed(request):
+    with camera_lock:
+        if not is_camera_open():
+            print("[VIDEO_FEED] Camera not open. Trying to initialize...")
+            init_camera()
     try:
         return StreamingHttpResponse(
             gen_frames(),
@@ -163,26 +167,29 @@ def video_feed(request):
     except Exception as e:
         return HttpResponseServerError(f"Camera error: {e}")
 
+
 @login_required
 def stream_page(request):
     print("[STREAM PAGE] Checking camera status...")
 
-    camera_error = None
     settings_obj = get_camera_settings_safe()
 
+    with camera_lock:
+        if not is_camera_open():
+            print("[STREAM PAGE] Camera is NOT open, trying to init.")
+            init_camera()
+
+    camera_error = None
     if not is_camera_open():
-        print("[STREAM PAGE] Camera is NOT open.")
         camera_error = "Cannot open camera"
     elif settings_obj is None:
-        print("[STREAM PAGE] Camera settings are missing.")
         camera_error = "Settings not ready (DB table missing?)"
-    else:
-        print("[STREAM PAGE] Camera is open and settings exist.")
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
         "title": "Live Stream"
     })
+
 
 @login_required
 def record_video(request):
