@@ -20,17 +20,16 @@
 
 <script>
 function updateRecordingStatus() {
-    const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    fetch("{% url 'is_recording' %}", {
-        method: "POST",
-        headers: {
-            'X-CSRFToken': csrftoken,
-            'Content-Type': 'application/json'
-        }
-    }).then(() => updateRecordingStatus());
-
+    function updateRecordingStatus() {
+    fetch("{% url 'is_recording' %}")
+        .then(response => response.json())
+        .then(data => {
+            const el = document.getElementById("recordStatus");
+            el.innerText = data.recording ? "● Recording in progress" : "Not recording";
+            el.style.color = data.recording ? "red" : "black";
+        });
 }
+
 
 setInterval(updateRecordingStatus, 3000);
 updateRecordingStatus();
