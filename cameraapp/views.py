@@ -451,6 +451,8 @@ def update_camera_settings(request):
         print(f"[UPDATE_CAMERA_SETTINGS] Fehler beim Speichern: {e}")
         return HttpResponseRedirect(reverse("stream_page"))
 
+
+
     with camera_lock:
         livestream_job.stop()
         time.sleep(1.0)
@@ -467,6 +469,11 @@ def update_camera_settings(request):
         else:
             print("[UPDATE_CAMERA_SETTINGS] Kamera konnte nicht erneut geöffnet werden.")
 
+        # 💡 Hier: neuen Thread erzeugen
+        livestream_job = LiveStreamJob(
+            camera_url=CAMERA_URL,
+            frame_callback=lambda f: update_latest_frame(f)
+        )
         livestream_job.start()
         print("[UPDATE_CAMERA_SETTINGS] Livestream neu gestartet.")
 
