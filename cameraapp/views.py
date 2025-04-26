@@ -71,6 +71,7 @@ def logout_view(request):
     logout(request)
     return redirect("login")
 
+
 def get_camera_settings():
     return CameraSettings.objects.first()
 
