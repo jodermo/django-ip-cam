@@ -45,6 +45,8 @@ recording_thread = None
 recording_active = False
 recording_lock = threading.Lock()
 recording_timeout = 30  # Sekunden Fallback
+latest_frame = None  
+latest_frame_lock = threading.Lock()
 
 def logout_view(request):
     logout(request)
@@ -109,9 +111,8 @@ def read_frame():
         return frame if ret else None
 
 
-
 def gen_frames():
-    global active_stream_viewers, last_disconnect_time
+    global active_stream_viewers, last_disconnect_time, latest_frame
     print("[GEN_FRAMES] Start streaming loop.")
 
     with camera_lock:
@@ -132,8 +133,17 @@ def gen_frames():
 
             if overlay:
                 timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-                cv2.putText(frame, timestamp, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                cv2.putText(
+                    frame, timestamp,
+                    (10, 25), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8, (255, 255, 255), 2
+                )
 
+            # Update latest_frame for recorder
+            with latest_frame_lock:
+                latest_frame = frame.copy()
+
+            # Encode and stream
             ret, buffer = cv2.imencode(".jpg", frame)
             if not ret:
                 print("[GEN_FRAMES] Encoding failed.")
@@ -141,8 +151,11 @@ def gen_frames():
 
             yield (
                 b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" +
+                buffer.tobytes() +
+                b"\r\n"
             )
+
     finally:
         with camera_lock:
             active_stream_viewers -= 1
@@ -150,6 +163,7 @@ def gen_frames():
             if active_stream_viewers <= 0:
                 last_disconnect_time = time.time()
                 threading.Thread(target=delayed_camera_release).start()
+
 
 
 def delayed_camera_release():
@@ -280,7 +294,6 @@ def settings_view(request):
         "title": "Settings"
     })
 
-
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
     with camera_lock:
         if not is_camera_open():
@@ -292,17 +305,22 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
         fourcc = cv2.VideoWriter_fourcc(*codec)
         out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
 
-        start = time.time()
-        while time.time() - start < duration:
-            frame = read_frame()
-            if frame is None:
-                print("[RECORD] Frame read failed.")
-                break
-            out.write(cv2.resize(frame, resolution))
+    start_time = time.time()
+    while time.time() - start_time < duration:
+        with latest_frame_lock:
+            frame = latest_frame.copy() if latest_frame is not None else None
 
-        out.release()
-        print("[RECORD] Recording complete.")
-        return True
+        if frame is None:
+            time.sleep(0.05)
+            continue
+
+        out.write(cv2.resize(frame, resolution))
+        time.sleep(1.0 / fps)
+
+    out.release()
+    print("[RECORD] Recording complete.")
+    return True
+
 
 @login_required
 def record_video(request):
