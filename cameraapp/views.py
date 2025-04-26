@@ -349,6 +349,8 @@ def pause_livestream():
         time.sleep(0.5)  # Kamera freigeben lassen
 
 def resume_livestream():
+    print("[PHOTO] Warte auf Freigabe der Kamera...")
+    time.sleep(1.5)  # Verzögerung für sichere Freigabe
     if not livestream_job.running:
         livestream_job.start()
         print("[PHOTO] Livestream wurde wieder gestartet.")
