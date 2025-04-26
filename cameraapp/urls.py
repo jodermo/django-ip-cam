@@ -12,4 +12,5 @@ urlpatterns = [
     path("settings/", views.settings_view, name="settings_view"),
     path("accounts/logout/", views.logout_view, name="logout"),
     path("reboot/", views.reboot_pi, name="reboot_pi"),
+    path("media-browser/", views.media_browser, name="media_browser"),
 ]

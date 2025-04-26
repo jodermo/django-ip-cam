@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Media Browser</h1>
+
+{% for section in media_tree %}
+  <h2>{{ section.label }}</h2>
+  <ul>
+    {% for item in section.content %}
+      {% include "cameraapp/media_item.html" with item=item %}
+    {% endfor %}
+  </ul>
+{% endfor %}
+
+{% endblock %}

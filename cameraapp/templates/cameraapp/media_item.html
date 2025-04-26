@@ -1,0 +1,17 @@
+<li>
+    {% if item.type == "dir" %}
+      <strong>{{ item.name }}/</strong>
+      <ul>
+        {% for child in item.children %}
+          {% include "cameraapp/media_item.html" with item=child %}
+        {% endfor %}
+      </ul>
+    {% elif item.type == "image" %}
+      <p>{{ item.name }}</p>
+      <img src="{{ item.url }}" width="320" style="margin-bottom: 10px;" />
+    {% elif item.type == "video" %}
+      <p>{{ item.name }}</p>
+      <video src="{{ item.url }}" width="320" controls style="margin-bottom: 10px;"></video>
+    {% endif %}
+  </li>
+  

@@ -14,7 +14,7 @@ from django.db import connection
 from django.contrib.auth import logout
 import subprocess
 from django.views.decorators.csrf import csrf_exempt
-
+from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 
@@ -318,3 +318,49 @@ def stop_recording(request):
     with recording_lock:
         recording_active = False
     return JsonResponse({"status": "stopped"})
+
+
+
+
+@login_required
+def media_browser(request):
+    media_tree = []
+
+    def collect_files(base_url, base_path):
+        result = []
+        if os.path.exists(base_path):
+            for fname in sorted(os.listdir(base_path)):
+                full_path = os.path.join(base_path, fname)
+                url_path = f"{base_url}/{fname}"
+                if os.path.isdir(full_path):
+                    result.append({
+                        "type": "dir",
+                        "name": fname,
+                        "children": collect_files(url_path, full_path)
+                    })
+                else:
+                    ext = fname.split(".")[-1].lower()
+                    file_type = "video" if ext in ["mp4", "avi", "mov"] else "image"
+                    result.append({
+                        "type": file_type,
+                        "name": fname,
+                        "url": url_path
+                    })
+        return result
+
+    media_tree.append({
+        "label": "Recordings",
+        "path": "/media/recordings",
+        "content": collect_files("/media/recordings", RECORD_DIR)
+    })
+
+    media_tree.append({
+        "label": "Photos",
+        "path": "/media/photos",
+        "content": collect_files("/media/photos", PHOTO_DIR)
+    })
+
+    return render(request, "cameraapp/media_browser.html", {
+        "media_tree": media_tree,
+        "title": "Media Browser"
+    })
