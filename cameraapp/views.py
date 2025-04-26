@@ -175,8 +175,6 @@ def stream_page(request):
     if not livestream_job.running:
         livestream_job.start()
 
-    if not camera_instance or not camera_instance.isOpened():
-        camera_error = "Camera could not be opened. Check connection or settings."
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
