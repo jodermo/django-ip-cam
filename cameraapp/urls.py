@@ -8,6 +8,7 @@ urlpatterns = [
     path("auto_photo_settings/", views.auto_photo_settings, name="auto_photo_settings"),
     path("photo/settings/", views.photo_settings_page, name="photo_settings_page"),
     path("photo/auto-adjust/", views.auto_photo_adjust, name="auto_photo_adjust"),
+    path("reset_camera/", views.reset_camera_settings, name="reset_camera"),
     path("photo/manual/", views.take_photo_now, name="take_photo_now"), 
     path("video_feed/", views.video_feed, name="video_feed"),
     path("start_recording/", views.start_recording, name="start_recording"),

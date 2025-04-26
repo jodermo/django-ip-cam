@@ -26,7 +26,7 @@ from django.contrib.auth import logout
 # project
 from .models import CameraSettings
 from .camera_core import (
-    init_camera, camera_instance, apply_photo_settings,
+    init_camera, camera_instance, reset_to_default, apply_photo_settings,
     apply_auto_settings, auto_adjust_from_frame, apply_cv_settings
 )
 from .recording_job import RecordingJob
@@ -97,7 +97,12 @@ def reboot_pi(request):
         return render(request, "cameraapp/rebooting.html")
     return redirect("settings_view")
 
-
+@csrf_exempt 
+def reset_camera_settings(request):
+    if request.method == "POST":
+        reset_to_default()
+        init_camera()
+    return redirect("settings_view")
 
 @login_required
 def video_feed(request):
@@ -226,6 +231,12 @@ def record_video(request):
         print(f"[RECORD_VIDEO] Fehler: {e}")
         return JsonResponse({"error": str(e)}, status=400)
 
+
+
+def reset_camera_view(request):
+    reset_to_default()
+    init_camera()
+    return redirect("settings_page")  # oder wo du zurück willst
 
 
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):

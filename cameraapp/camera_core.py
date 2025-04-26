@@ -3,7 +3,7 @@ import cv2
 import time
 from django.apps import apps
 from .globals import camera_lock, latest_frame, latest_frame_lock
-
+from cameraapp.models import CameraSettings
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -70,16 +70,34 @@ def init_camera():
         except Exception as e:
             print(f"[CAMERA_CORE] Exception while applying settings: {e}")
 
+def reset_to_default():
+    settings = CameraSettings.objects.first()
+    if not settings:
+        print("[RESET] Keine CameraSettings gefunden. Abbruch.")
+        return
+
+    # Reset für Foto-Modus
+    settings.photo_exposure_mode = "auto"
+    settings.photo_brightness = -1
+    settings.photo_contrast = -1
+    settings.photo_saturation = -1
+    settings.photo_exposure = -1
+    settings.photo_gain = -1
+
+    # Reset für Video-Modus
+    settings.video_exposure_mode = "auto"
+    settings.video_brightness = -1
+    settings.video_contrast = -1
+    settings.video_saturation = -1
+    settings.video_exposure = -1
+    settings.video_gain = -1
+
+    settings.save()
+    print("[RESET] CameraSettings auf Default zurückgesetzt (Auto-Modus, keine Werte gesetzt).")
+
 
 def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
 
-    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
-
-    # TEST: explizit alle Werte auf -1 (default/reset)
-    for p in ["BRIGHTNESS", "CONTRAST", "SATURATION", "EXPOSURE", "GAIN"]:
-        cap.set(getattr(cv2, f"CAP_PROP_{p}"), -1)
-
-    return
     if not settings:
         print("[CAMERA_CORE] Keine Einstellungen übergeben.")
         return
@@ -112,6 +130,9 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     def apply_param(cap, name):
         try:
             value = float(getattr(settings, f"{prefix}{name}", None))
+            if value < 0:
+                print(f"[CAMERA_CORE] {name} deaktiviert (value={value})")
+                return
         except (TypeError, ValueError):
             print(f"[WARNING] Ungültiger Wert für {prefix}{name}")
             return
@@ -125,12 +146,12 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
         actual = cap.get(cap_prop)
         print(f"[CAMERA_CORE] {mode.upper()} Set {name} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
 
+
     for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
         apply_param(cap, param)
 
 
 def apply_camera_settings(cap, brightness=None, contrast=None):
-    return
     if cap and cap.isOpened():
         if brightness is not None:
             cap.set(cv2.CAP_PROP_BRIGHTNESS, brightness)
@@ -140,7 +161,6 @@ def apply_camera_settings(cap, brightness=None, contrast=None):
 def apply_video_settings(cap):
     from cameraapp.models import CameraSettings
     settings = CameraSettings.objects.first()
-    return
     if not cap or not settings or not cap.isOpened():
         return
 

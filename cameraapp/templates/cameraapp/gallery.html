@@ -66,7 +66,10 @@
       <button type="submit">Speichern</button>
     </form>
 
-    
+    <form method="post" action="{% url 'reset_camera' %}">
+        {% csrf_token %}
+        <button type="submit">🔄 Kamera zurücksetzen</button>
+    </form>
     
     <button onclick="takePhoto()" style="margin-top: 10px;">📷 Manuelles Foto aufnehmen</button>
 

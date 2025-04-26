@@ -46,7 +46,10 @@
     </form>
 
 
-    
+    <form method="post" action="{% url 'reset_camera' %}">
+        {% csrf_token %}
+        <button type="submit">🔄 Kamera zurücksetzen</button>
+    </form>
     
     <button onclick="autoAdjust()">
         🌞 Auto-Anpassen vom Livebild
