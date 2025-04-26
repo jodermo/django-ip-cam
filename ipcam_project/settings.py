@@ -16,6 +16,14 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = ["*"]  # Adjust for production
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://really.dont-use.com",
+    "http://192.168.0.138",
+    "http://localhost",
+    "http://127.0.0.1"
+]
+
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",

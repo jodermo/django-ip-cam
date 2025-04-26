@@ -188,7 +188,9 @@ sudo chmod -R u+rw ./nginx/certbot/conf
 ```
 sudo chmod -R 777 ./nginx/certbot/conf
 
-
+sudo chown -R $USER:$USER nginx/certbot
+chmod -R 755 nginx/certbot
+sudo chmod -R 755 nginx/certbot/conf/archive
 
 start cert bot for the first time
 ```bash
