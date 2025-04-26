@@ -16,6 +16,8 @@ import subprocess
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
+from django.http import HttpResponseRedirect
+from django.urls import reverse
 from .recording_job import RecordingJob
 from .livestream_job import LiveStreamJob
 
@@ -297,3 +299,22 @@ def media_browser(request):
     return render(request, "cameraapp/media_browser.html", {"media_tree": media_tree, "title": "Media Browser"})
 
 
+
+
+
+@require_POST
+@login_required
+def update_camera_settings(request):
+    settings_obj = get_camera_settings()
+    if settings_obj:
+        for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+            value = request.POST.get(param)
+            if value is not None:
+                try:
+                    setattr(settings_obj, f"video_{param}", float(value))
+                except ValueError:
+                    continue
+        settings_obj.save()
+        from .camera_core import init_camera
+        init_camera()
+    return HttpResponseRedirect(reverse("stream_page"))

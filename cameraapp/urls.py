@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path("", views.stream_page, name="stream_page"),
+    path("update-settings/", views.update_camera_settings, name="update_camera_settings"),
     path("video_feed/", views.video_feed, name="video_feed"),
     path("start_recording/", views.start_recording, name="start_recording"),
     path("stop_recording/", views.stop_recording, name="stop_recording"),
