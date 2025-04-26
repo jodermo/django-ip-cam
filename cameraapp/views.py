@@ -385,13 +385,35 @@ def auto_photo_settings(request):
 @require_POST
 @login_required
 def auto_photo_adjust(request):
-    from .camera_core import auto_adjust_from_frame
+    from .camera_core import auto_adjust_from_frame, apply_cv_settings
     settings = get_camera_settings()
+
+    if not settings:
+        return JsonResponse({"status": "no settings found"}, status=500)
+
     with latest_frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
-    if settings and frame is not None:
+
+    if frame is not None:
         auto_adjust_from_frame(frame, settings)
-        from .camera_core import init_camera
-        init_camera()
-        return JsonResponse({"status": "auto adjusted from live frame"})
-    return JsonResponse({"status": "no frame available"}, status=500)
+        return JsonResponse({"status": "adjusted from live frame"})
+
+    # Fallback: temporäres Foto machen
+    print("[AUTO-ADJUST] No live frame, capturing temp image.")
+    cap = cv2.VideoCapture(CAMERA_URL)
+    if not cap.isOpened():
+        return JsonResponse({"status": "camera not available"}, status=500)
+
+    # Wende vorab aktuelle Video-Settings an
+    apply_cv_settings(cap, settings, mode="video")
+    time.sleep(0.3)  # kleine Pause für Stabilisierung
+
+    ret, temp_frame = cap.read()
+    cap.release()
+
+    if not ret or temp_frame is None:
+        return JsonResponse({"status": "could not capture frame"}, status=500)
+
+    auto_adjust_from_frame(temp_frame, settings)
+    return JsonResponse({"status": "adjusted from temp photo"})
+
