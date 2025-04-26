@@ -1,6 +1,7 @@
 import os
 import cv2
 import time
+import threading
 from django.apps import apps
 from .globals import camera_lock, latest_frame, latest_frame_lock
 from cameraapp.models import CameraSettings
@@ -34,9 +35,10 @@ def init_camera():
     with camera_lock:
         print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
 
-        if camera_instance:
-            print("[CAMERA_CORE] Releasing previous camera instance.")
-            camera_instance.release()
+    if camera_instance:
+        print("[CAMERA_CORE] Releasing previous camera instance.")
+        camera_instance.release()
+        time.sleep(1.0)
 
         print(f"[CAMERA_CORE] Attempting to open camera from source: {CAMERA_URL}")
         camera_instance = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
@@ -95,6 +97,12 @@ def reset_to_default():
     settings.save()
     print("[RESET] CameraSettings auf Default zurückgesetzt (Auto-Modus, keine Werte gesetzt).")
 
+    def delayed_reinit():
+        time.sleep(1.0)
+        init_camera()
+
+    threading.Thread(target=delayed_reinit).start()
+
 
 def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
 
@@ -130,8 +138,8 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     def apply_param(cap, name):
         try:
             value = float(getattr(settings, f"{prefix}{name}", None))
-            if value < 0:
-                print(f"[CAMERA_CORE] {name} deaktiviert (value={value})")
+            if value == -1:
+                print(f"[CAMERA_CORE] {name} skipped (-1)")
                 return
         except (TypeError, ValueError):
             print(f"[WARNING] Ungültiger Wert für {prefix}{name}")
@@ -141,6 +149,11 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
         if cap_prop is None:
             print(f"[WARNING] Unbekannte OpenCV-Eigenschaft: {name}")
             return
+
+        ok = cap.set(cap_prop, value)
+        actual = cap.get(cap_prop)
+        print(f"[CAMERA_CORE] {mode.upper()} Set {name} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
+
 
         ok = cap.set(cap_prop, value)
         actual = cap.get(cap_prop)
