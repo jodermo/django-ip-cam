@@ -73,14 +73,31 @@ def start_photo_scheduler():
 
 
 class LiveStreamJob(threading.Thread):
-    def __init__(self, camera_url):
+    def __init__(self, camera_url, frame_callback=None):
         super().__init__(daemon=True)
         self.camera_url = camera_url
+        self.frame_callback = frame_callback
         self.running = False
+        self.frame = None
+        self.cap = None
 
     def run(self):
         self.running = True
-        # hier deine Stream-Logik
+        self.cap = cv2.VideoCapture(self.camera_url)
+
+        while self.running and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if ret:
+                self.frame = frame
+                if self.frame_callback:
+                    self.frame_callback(frame)
+            time.sleep(0.03)
+
+        if self.cap:
+            self.cap.release()
+
+    def get_frame(self):
+        return self.frame
 
     def stop(self):
         self.running = False
