@@ -295,31 +295,44 @@ def settings_view(request):
     })
 
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
-    with camera_lock:
-        if not is_camera_open():
-            init_camera()
-        if not is_camera_open():
-            print("[RECORD] Cannot open camera.")
-            return False
+    global latest_frame
+    print(f"[RECORD] Saving to {filepath}")
 
-        fourcc = cv2.VideoWriter_fourcc(*codec)
-        out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
+    fourcc = cv2.VideoWriter_fourcc(*codec)
+    out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
 
-    start_time = time.time()
-    while time.time() - start_time < duration:
+    if not out.isOpened():
+        print("[RECORD] VideoWriter failed to open.")
+        return False
+
+    frame_count = 0
+    start = time.time()
+
+    while time.time() - start < duration:
         with latest_frame_lock:
             frame = latest_frame.copy() if latest_frame is not None else None
 
         if frame is None:
+            print("[RECORD] No latest_frame yet.")
             time.sleep(0.05)
             continue
 
-        out.write(cv2.resize(frame, resolution))
+        resized = cv2.resize(frame, resolution)
+        out.write(resized)
+        frame_count += 1
+
         time.sleep(1.0 / fps)
 
     out.release()
-    print("[RECORD] Recording complete.")
+
+    if frame_count == 0:
+        print("[RECORD] No frames written.")
+        os.remove(filepath)  # Clean up broken file
+        return False
+
+    print(f"[RECORD] Finished: {frame_count} frames written.")
     return True
+
 
 
 @login_required
