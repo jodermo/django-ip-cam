@@ -28,6 +28,9 @@ def try_open_camera(source, retries=3, delay=1.5):
     return None
 
 
+def get_camera_settings():
+    return CameraSettings.objects.first()
+
 def init_camera():
     global camera_instance
     from cameraapp.models import CameraSettings
@@ -117,7 +120,7 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
                 cap = new_cap
                 camera_instance = cap  # <--- DAS FEHLTE
                 print("[CAMERA_CORE] Kamera erfolgreich neu geöffnet.")
-                
+
         else:
             print("[CAMERA_CORE] Kein reopen_callback definiert – Abbruch.")
             return
