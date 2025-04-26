@@ -30,6 +30,10 @@ os.makedirs(PHOTO_DIR, exist_ok=True)
 camera_lock = threading.Lock()
 camera_instance = None
 
+active_stream_viewers = 0
+last_disconnect_time = None
+disconnect_timeout_sec = 10  # Shutdown after 10 seconds of inactivity
+
 
 def logout_view(request):
     logout(request)
@@ -87,32 +91,56 @@ def read_frame():
         return frame if ret else None
 
 def gen_frames():
+    global active_stream_viewers, last_disconnect_time
     print("[GEN_FRAMES] Start streaming loop.")
-    if not is_camera_open():
-        init_camera()
-    settings_obj = get_camera_settings()
-    overlay = settings_obj.overlay_timestamp if settings_obj else True
 
-    while True:
-        frame = read_frame()
-        if frame is None:
-            print("[GEN_FRAMES] No frame, sleeping 1s.")
-            time.sleep(1)
-            continue
+    with camera_lock:
+        if not is_camera_open():
+            init_camera()
+        active_stream_viewers += 1
+        print(f"[STREAM] Viewer connected. Active: {active_stream_viewers}")
 
-        if overlay:
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            cv2.putText(frame, timestamp, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+    try:
+        settings_obj = get_camera_settings()
+        overlay = settings_obj.overlay_timestamp if settings_obj else True
 
-        ret, buffer = cv2.imencode(".jpg", frame)
-        if not ret:
-            print("[GEN_FRAMES] Encoding failed.")
-            continue
+        while True:
+            frame = read_frame()
+            if frame is None:
+                print("[GEN_FRAMES] No frame, sleeping...")
+                time.sleep(1)
+                init_camera()
+                continue
 
-        yield (
-            b"--frame\r\n"
-            b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
-        )
+            if overlay:
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                cv2.putText(frame, timestamp, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+            ret, buffer = cv2.imencode(".jpg", frame)
+            if not ret:
+                print("[GEN_FRAMES] Frame encoding failed.")
+                continue
+
+            yield (b"--frame\r\n"
+                   b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
+    finally:
+        with camera_lock:
+            active_stream_viewers -= 1
+            print(f"[STREAM] Viewer disconnected. Active: {active_stream_viewers}")
+            if active_stream_viewers <= 0:
+                last_disconnect_time = time.time()
+                threading.Thread(target=delayed_camera_release).start()
+
+
+def delayed_camera_release():
+    global last_disconnect_time
+    time.sleep(disconnect_timeout_sec)
+    with camera_lock:
+        if active_stream_viewers == 0 and last_disconnect_time and (time.time() - last_disconnect_time >= disconnect_timeout_sec):
+            print("[CAMERA] No viewers for a while. Releasing camera.")
+            if camera_instance:
+                camera_instance.release()
+
 
 @login_required
 def video_feed(request):
