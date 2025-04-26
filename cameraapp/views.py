@@ -30,9 +30,8 @@ from .camera_core import (
     apply_auto_settings, auto_adjust_from_frame, apply_cv_settings
 )
 from .recording_job import RecordingJob
-from cameraapp.scheduler import LiveStreamJob
 
-from .scheduler import take_photo
+from .scheduler import take_photo, LiveStreamJob
 from .globals import camera_lock, latest_frame, latest_frame_lock
 
 from dotenv import load_dotenv
