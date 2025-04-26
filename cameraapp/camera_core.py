@@ -36,7 +36,6 @@ def try_open_camera(source, retries=3, delay=1.5):
 def init_camera():
     """Initialisiert die globale Kamera-Instanz mit gespeicherten Video-Settings."""
     global camera_instance
-    from .views import CAMERA_URL, CAMERA_URL_RAW
 
     print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
 
@@ -171,8 +170,10 @@ def auto_adjust_from_frame(frame, settings):
     settings.save()
     print("[CAMERA_CORE] Auto-adjusted settings saved based on frame analysis.")
 
+def set_cv_param(cap, prop, value):
+    if value >= 0:
+        cap.set(prop, value)
 
-# camera_core.py
 def apply_photo_settings(camera, settings):
     set_cv_param(camera, cv2.CAP_PROP_BRIGHTNESS, settings.photo_brightness)
     set_cv_param(camera, cv2.CAP_PROP_CONTRAST, settings.photo_contrast)

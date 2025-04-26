@@ -14,6 +14,7 @@ from django.http import (
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
 from django.conf import settings
@@ -95,18 +96,12 @@ def reboot_pi(request):
         return render(request, "cameraapp/rebooting.html")
     return redirect("settings_view")
 
-def get_frame(self):
-    return self.frame
-
 @login_required
 def video_feed(request):
 
     with camera_lock:
         if not livestream_job.running:
             livestream_job.start()
-
-    if not livestream_job.running:
-        livestream_job.start()
 
     def stream_generator():
         frame_fail_count = 0
@@ -169,25 +164,49 @@ def stream_page(request):
     })
 
 
+
+@require_GET
 @login_required
 def record_video(request):
     print("[RECORD_VIDEO] Called via GET")
+
     settings_obj = get_camera_settings()
-    duration = int(request.GET.get("duration", settings_obj.duration_sec if settings_obj else 5))
-    fps = float(request.GET.get("fps", settings_obj.record_fps if settings_obj else 20.0))
-    resolution = (
-        int(request.GET.get("width", settings_obj.resolution_width if settings_obj else 640)),
-        int(request.GET.get("height", settings_obj.resolution_height if settings_obj else 480))
-    )
-    codec = request.GET.get("codec", settings_obj.video_codec if settings_obj else "mp4v")
+    if not settings_obj:
+        return JsonResponse({"error": "No camera settings found."}, status=500)
 
-    filepath = os.path.join(RECORD_DIR, f"clip_{time.strftime('%Y%m%d-%H%M%S')}.mp4")
+    try:
+        duration = int(request.GET.get("duration", settings_obj.duration_sec))
+        fps = float(request.GET.get("fps", settings_obj.record_fps))
+        width = int(request.GET.get("width", settings_obj.resolution_width))
+        height = int(request.GET.get("height", settings_obj.resolution_height))
+        codec = request.GET.get("codec", settings_obj.video_codec)
 
-    def async_record():
-        record_video_to_file(filepath, duration, fps, resolution, codec)
+        resolution = (width, height)
+        filepath = os.path.join(RECORD_DIR, f"clip_{time.strftime('%Y%m%d-%H%M%S')}.mp4")
 
-    threading.Thread(target=async_record).start()
-    return JsonResponse({"status": "recording started", "file": filepath})
+        def async_record():
+            success = record_video_to_file(filepath, duration, fps, resolution, codec)
+            if not success:
+                print(f"[RECORD_VIDEO] Aufnahme fehlgeschlagen: {filepath}")
+            else:
+                print(f"[RECORD_VIDEO] Video gespeichert: {filepath}")
+
+        threading.Thread(target=async_record, daemon=True).start()
+
+        return JsonResponse({
+            "status": "recording started",
+            "file": filepath,
+            "duration": duration,
+            "fps": fps,
+            "resolution": resolution,
+            "codec": codec
+        })
+
+    except Exception as e:
+        print(f"[RECORD_VIDEO] Fehler: {e}")
+        return JsonResponse({"error": str(e)}, status=400)
+
+
 
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
     """
@@ -223,7 +242,7 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
                 time.sleep(0.05)
                 continue
 
-            resized_frame = cv2.resize(frame, resolution)
+            resized_frame = cv2.resize(frame.copy(), resolution)
             out.write(resized_frame)
             frame_count += 1
 
@@ -408,29 +427,35 @@ def update_photo_settings(request):
     """Aktualisiert Foto-Kameraeinstellungen aus dem Formular."""
     try:
         settings_obj = CameraSettings.objects.first()
-        if settings_obj:
-            for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-                value = request.POST.get(f"photo_{param}")
-                if value is not None:
-                    try:
-                        setattr(settings_obj, f"photo_{param}", float(value))
-                    except ValueError:
-                        print(f"[UPDATE_PHOTO_SETTINGS] Ungültiger Wert für {param}: {value}")
-                        continue
-
-            settings_obj.save()
-            print("[UPDATE_PHOTO_SETTINGS] Fotoeinstellungen gespeichert.")
-
-            # init_camera() // only for videos
-            # apply_photo_settings(camera_instance, settings_obj)
-
-        else:
+        if not settings_obj:
             print("[UPDATE_PHOTO_SETTINGS] Kein CameraSettings-Objekt gefunden.")
+            return HttpResponseRedirect(reverse("photo_settings_page"))
+
+        for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+            value = request.POST.get(f"photo_{param}")
+            if value is not None:
+                try:
+                    setattr(settings_obj, f"photo_{param}", float(value))
+                except ValueError:
+                    print(f"[UPDATE_PHOTO_SETTINGS] Ungültiger Wert für {param}: {value}")
+                    continue
+
+        # OPTIONAL: Belichtungsmodus auch für Foto speichern (falls du es implementierst)
+        exposure_mode = request.POST.get("photo_exposure_mode")
+        if exposure_mode in ["auto", "manual"]:
+            setattr(settings_obj, "photo_exposure_mode", exposure_mode)
+
+        settings_obj.save()
+        print("[UPDATE_PHOTO_SETTINGS] Fotoeinstellungen gespeichert.")
+
+        # Optional anwenden:
+        # apply_photo_settings(camera_instance, settings_obj)
 
     except Exception as e:
         print(f"[UPDATE_PHOTO_SETTINGS] Fehler beim Speichern der Fotoeinstellungen: {e}")
 
-    return HttpResponseRedirect(reverse("photo_settings_page"))  # Ziel-View anpassen
+    return HttpResponseRedirect(reverse("photo_settings_page"))
+
 
 
 
