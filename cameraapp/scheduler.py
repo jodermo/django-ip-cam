@@ -38,7 +38,7 @@ def take_photo():
         print("[PHOTO] Fehler beim Erfassen des Bildes.")
 
     cap.release()
-    init_camera()  # Optional: Hauptkamera reinitialisieren, wenn notwendig
+
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
     """Wartet bis die gegebene Tabelle verfügbar ist (z. B. nach Migration)."""

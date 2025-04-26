@@ -16,7 +16,3 @@ def init_camera():
     if camera_instance:
         camera_instance.release()
     camera_instance = cv2.VideoCapture(CAMERA_URL)
-    print(f"[CAMERA_CORE] Camera initialized from: {CAMERA_URL}")
-    if not camera_instance.isOpened():
-        print("[CAMERA_CORE] Failed to open camera.")
-        camera_instance = None
