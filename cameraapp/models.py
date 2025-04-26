@@ -52,12 +52,18 @@ class CameraSettings(models.Model):
         ("manual", "Manuell"),
     ]
 
-    photo_exposure_mode = models.CharField(
+
+    video_exposure_mode = models.CharField(
         max_length=10,
         choices=[("auto", "Auto"), ("manual", "Manuell")],
         default="manual"
     )
 
+    photo_exposure_mode = models.CharField(
+        max_length=10,
+        choices=[("auto", "Auto"), ("manual", "Manuell")],
+        default="manual"
+    )
 
     def __str__(self):
         return "Global Camera Settings"
