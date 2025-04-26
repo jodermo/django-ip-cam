@@ -3,6 +3,7 @@ import os
 import cv2
 import time
 import threading
+import datetime
 from django.http import StreamingHttpResponse, HttpResponseServerError, JsonResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
@@ -341,10 +342,12 @@ def media_browser(request):
                 else:
                     ext = fname.split(".")[-1].lower()
                     file_type = "video" if ext in ["mp4", "avi", "mov"] else "image"
+                    mtime = datetime.datetime.fromtimestamp(os.path.getmtime(full_path))
                     result.append({
                         "type": file_type,
                         "name": fname,
-                        "url": url_path
+                        "url": url_path,
+                        "mtime": mtime
                     })
         return result
 
