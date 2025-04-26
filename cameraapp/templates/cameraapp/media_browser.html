@@ -4,11 +4,56 @@
 
 {% for section in media_tree %}
   <h2>{{ section.label }}</h2>
-  <ul>
+  <ul class="tree">
     {% for item in section.content %}
       {% include "cameraapp/media_item.html" with item=item %}
     {% endfor %}
-  </ul>
+  </ul>  
 {% endfor %}
-
+<style>
+    ul.tree, ul.tree ul {
+        list-style: none;
+        margin: 0;
+        padding-left: 1em;
+        position: relative;
+    }
+    
+    ul.tree ul {
+        display: none; /* collapsed by default */
+    }
+    
+    ul.tree li::before {
+        content: "▶";
+        display: inline-block;
+        width: 1em;
+        cursor: pointer;
+    }
+    
+    ul.tree li.expanded > ul {
+        display: block;
+    }
+    
+    ul.tree li.expanded::before {
+        content: "▼";
+    }
+    </style>
+    
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll("ul.tree li").forEach(function (li) {
+            const hasChildren = li.querySelector("ul");
+            if (hasChildren) {
+                li.classList.add("collapsible");
+                li.addEventListener("click", function (e) {
+                    // Prevent click on nested elements like <a>, <video>, etc.
+                    if (e.target === li || e.target.tagName === "STRONG") {
+                        li.classList.toggle("expanded");
+                        e.stopPropagation();
+                    }
+                });
+            }
+        });
+    });
+    </script>
+    
 {% endblock %}

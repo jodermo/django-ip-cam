@@ -7,14 +7,14 @@
         {% endfor %}
       </ul>
     {% elif item.type == "image" %}
-        <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
-        <img src="{{ item.url }}" width="320" style="margin-bottom: 10px;" />
+      <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
+      <img src="{{ item.url }}" width="320" style="margin-bottom: 10px;" />
     {% elif item.type == "video" %}
-        <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
-        <video width="320" controls style="margin-bottom: 10px;">
-            <source src="{{ item.url }}" type="video/mp4">
-            Your browser does not support the video tag.
-        </video>
+      <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
+      <video width="320" controls style="margin-bottom: 10px;">
+        <source src="{{ item.url }}" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
     {% endif %}
   </li>
   
