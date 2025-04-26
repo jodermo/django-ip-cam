@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-
+<meta name="csrf-token" content="{{ csrf_token }}">
 <h1>Live Kamera</h1>
 <p>Angemeldet als: {{ request.user.username }}</p>
 <p><a href="{% url 'logout' %}">Logout</a></p>
-<meta name="csrf-token" content="{{ csrf_token }}">
+
 
 {% if camera_error %}
     <p style="color: red;">Error: {{ camera_error }}</p>
@@ -20,18 +20,16 @@
 
 <script>
 function updateRecordingStatus() {
-    fetch("{% url 'is_recording' %}")
-        .then(response => response.json())
-        .then(data => {
-            const el = document.getElementById("recordStatus");
-            if (data.recording) {
-                el.innerText = "● Recording in progress";
-                el.style.color = "red";
-            } else {
-                el.innerText = "Not recording";
-                el.style.color = "black";
-            }
-        });
+    const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    fetch("{% url 'start_recording' %}", {
+        method: "POST",
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json'
+        }
+    }).then(() => updateRecordingStatus());
+
 }
 
 setInterval(updateRecordingStatus, 3000);

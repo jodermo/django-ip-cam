@@ -295,43 +295,46 @@ def settings_view(request):
     })
 
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
-    global latest_frame
-    print(f"[RECORD] Saving to {filepath}")
+    print(f"[RECORD_TO_FILE] Begin: {filepath}")
+    print(f"[RECORD_TO_FILE] Params → Duration: {duration}, FPS: {fps}, Resolution: {resolution}, Codec: {codec}")
 
-    fourcc = cv2.VideoWriter_fourcc(*codec)
-    out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
+    with camera_lock:
+        if not is_camera_open():
+            print("[RECORD_TO_FILE] Camera not open. Trying to init.")
+            init_camera()
 
-    if not out.isOpened():
-        print("[RECORD] VideoWriter failed to open.")
-        return False
+        if not is_camera_open():
+            print("[RECORD_TO_FILE] Still no camera. Abort.")
+            return False
 
-    frame_count = 0
-    start = time.time()
+        print("[RECORD_TO_FILE] Camera OK. Creating VideoWriter...")
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
 
-    while time.time() - start < duration:
-        with latest_frame_lock:
-            frame = latest_frame.copy() if latest_frame is not None else None
+        if not out.isOpened():
+            print("[RECORD_TO_FILE] VideoWriter failed to open!")
+            return False
 
-        if frame is None:
-            print("[RECORD] No latest_frame yet.")
-            time.sleep(0.05)
-            continue
+        frame_count = 0
+        start_time = time.time()
 
-        resized = cv2.resize(frame, resolution)
-        out.write(resized)
-        frame_count += 1
+        while time.time() - start_time < duration:
+            frame = read_frame()
+            if frame is None:
+                print(f"[RECORD_TO_FILE] Frame {frame_count}: NULL")
+                continue
 
-        time.sleep(1.0 / fps)
+            resized = cv2.resize(frame, resolution)
+            out.write(resized)
+            frame_count += 1
 
-    out.release()
+            if frame_count % 10 == 0:
+                print(f"[RECORD_TO_FILE] Wrote {frame_count} frames...")
 
-    if frame_count == 0:
-        print("[RECORD] No frames written.")
-        os.remove(filepath)  # Clean up broken file
-        return False
+        out.release()
+        print(f"[RECORD_TO_FILE] Finished. Total frames: {frame_count}")
 
-    print(f"[RECORD] Finished: {frame_count} frames written.")
-    return True
+    return frame_count > 0
 
 
 
@@ -370,6 +373,7 @@ def record_video(request):
 @require_POST
 @login_required
 def start_recording(request):
+    print("[DEBUG] start_recording view triggered")
     global recording_thread, recording_active
 
     settings_obj = get_camera_settings()
@@ -432,7 +436,9 @@ def stop_recording(request):
 @login_required
 def is_recording(request):
     with recording_lock:
+        print(f"[IS_RECORDING] Called → State: {recording_active}")
         return JsonResponse({"recording": recording_active})
+
 
 
 @login_required
