@@ -1,4 +1,3 @@
-# scheduler.py
 import os
 import time
 import cv2
@@ -7,40 +6,42 @@ from django.conf import settings
 from django.apps import apps
 from django.db import connections
 
-# Import global Kameraobjekte und Methoden aus views
-from cameraapp.views import camera_lock, camera_instance, read_frame, is_camera_open, init_camera
+# Separat importiert, keine Abhängigkeit mehr zu views.py
+from .camera_core import init_camera  # falls notwendig, z. B. zum Zurücksetzen nach Foto
 
-# Verzeichnis für Fotos
+# Fotoverzeichnis sicherstellen
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
 def get_camera_settings():
-    """Lädt die aktuellen Kameraeinstellungen aus der Datenbank."""
+    """Lädt Kameraeinstellungen sicher."""
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
 
 def take_photo():
-    """Unabhängige Aufnahme über eigene Kamera-Instanz."""
+    """Unabhängige Fotoaufnahme mit eigener Kamera-Session."""
     camera_url_raw = os.getenv("CAMERA_URL", "0")
     camera_url = int(camera_url_raw) if camera_url_raw.isdigit() else camera_url_raw
 
     cap = cv2.VideoCapture(camera_url)
     if not cap.isOpened():
-        print("[PHOTO] Camera not available.")
+        print("[PHOTO] Kamera konnte nicht geöffnet werden.")
         return
+
     ret, frame = cap.read()
     if ret:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
-        cv2.imwrite(path, frame)
-        print(f"[PHOTO] Saved: {path}")
+        filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
+        cv2.imwrite(filepath, frame)
+        print(f"[PHOTO] Gespeichert: {filepath}")
     else:
-        print("[PHOTO] Failed to capture.")
+        print("[PHOTO] Fehler beim Erfassen des Bildes.")
+
     cap.release()
-    init_camera()
+    init_camera()  # Optional: Hauptkamera reinitialisieren, wenn notwendig
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
-    """Wartet darauf, dass die Datenbanktabelle verfügbar ist (z. B. nach Container-Start)."""
+    """Wartet bis die gegebene Tabelle verfügbar ist (z. B. nach Migration)."""
     start = time.time()
     while time.time() - start < timeout:
         try:
@@ -49,11 +50,11 @@ def wait_for_table(table_name, db_alias="default", timeout=30):
             return
         except Exception:
             time.sleep(1)
-    print(f"[ERROR] Timeout: Tabelle {table_name} nicht verfügbar nach {timeout} Sekunden.")
+    print(f"[ERROR] Timeout: Tabelle '{table_name}' nicht gefunden nach {timeout}s.")
 
 def start_photo_scheduler():
-    """Startet den Endlosschleifen-Fototimer, sofern Timelapse aktiviert ist."""
-    print("[SCHEDULER] Initialisiere Timelapse...")
+    """Endlosschleife für zeitgesteuerte Fotoaufnahmen (Timelapse)."""
+    print("[SCHEDULER] Starte Timelapse Scheduler...")
     wait_for_table("cameraapp_camerasettings")
 
     while True:
@@ -62,5 +63,5 @@ def start_photo_scheduler():
             take_photo()
             interval_min = settings_obj.photo_interval_min
         else:
-            interval_min = 15  # Fallback
+            interval_min = 15  # Default: alle 15 Minuten
         time.sleep(interval_min * 60)
