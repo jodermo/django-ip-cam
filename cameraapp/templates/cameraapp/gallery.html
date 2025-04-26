@@ -99,12 +99,19 @@
 
                 const match = src.match(/photo_(\d{8}_\d{6})/);
                 if (match) {
-                    const rawTimestamp = match[1];
-                    const datePart = rawTimestamp.slice(0, 8);
-                    const timePart = rawTimestamp.slice(9, 15);
-                    const formattedDate = `${datePart.slice(6, 8)}.${datePart.slice(4, 6)}.${datePart.slice(0, 4)}`;
-                    const formattedTime = `${timePart.slice(0, 2)}:${timePart.slice(2, 4)}:${timePart.slice(4, 6)}`;
-                    const timestamp = `⏱ ${formattedDate} ${formattedTime}`;
+                    const raw = match[1]; // z. B. 20250426_101234
+                    const year = raw.slice(0, 4);
+                    const month = raw.slice(4, 6);
+                    const day = raw.slice(6, 8);
+                    const hour = raw.slice(9, 11);
+                    const minute = raw.slice(11, 13);
+                    const second = raw.slice(13, 15);
+
+                    // Erzeuge echte JS-Zeit in der lokalen Zeitzone
+                    const localDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+
+                    const timestamp = `⏱ ${localDate.toLocaleDateString()} ${localDate.toLocaleTimeString()}`;
+
 
                     ctx.font = "18px monospace";
                     ctx.fillStyle = "rgba(0, 0, 0, 0.5)";

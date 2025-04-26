@@ -342,8 +342,26 @@ def update_photo_settings(request):
         return redirect("photo_gallery")
 
 
+def pause_livestream():
+    if livestream_job.running:
+        livestream_job.stop()
+        print("[PHOTO] Livestream wurde pausiert für Fotoaufnahme.")
+        time.sleep(0.5)  # Kamera freigeben lassen
+
+def resume_livestream():
+    if not livestream_job.running:
+        livestream_job.start()
+        print("[PHOTO] Livestream wurde wieder gestartet.")
+
+
+
 @require_POST
 @login_required
 def take_photo_now(request):
-    take_photo()
-    return JsonResponse({"status": "ok"})
+    from .views import pause_livestream, resume_livestream
+    with camera_lock:
+        pause_livestream()
+        try:
+            take_photo()
+        finally:
+            resume_livestream()
