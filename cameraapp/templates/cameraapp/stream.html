@@ -1,112 +1,166 @@
 {% extends "base.html" %}
 {% block content %}
 <meta name="csrf-token" content="{{ csrf_token }}">
-<h1>Live Kamera</h1>
-<p>Angemeldet als: {{ request.user.username }}</p>
-<p><a href="{% url 'logout' %}">Logout</a></p>
 
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+  }
 
-{% if camera_error %}
-    <p style="color: red;">Error: {{ camera_error }}</p>
-{% else %}
-    <p><strong>Aktive Zuschauer:</strong> {{ viewer_count }}</p>
-    <img id="streamImage" src="{% url 'video_feed' %}?t={{ now|date:'U' }}" width="960" height="540" alt="Live Stream">
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-          const form = document.querySelector("form[action='{% url 'update_camera_settings' %}']");
-          const img = document.getElementById("streamImage");
-          if (form && img) {
-            form.addEventListener("submit", () => {
-              img.src = "";  // Stoppt den MJPEG-Stream
-            });
-          }
-        });
-        </script>
-        
-    <div style="margin-top:10px;">
-        <button onclick="startRecording()">Start Recording</button>
-        <button onclick="stopRecording()">Stop Recording</button>
-    </div>
-    <p id="recordStatus" style="font-weight: bold;"></p>
+  #streamContainer {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+    background: black;
+  }
 
+  #streamImage {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+  }
+
+  .overlay-controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1em;
+    border-radius: 8px;
+    color: white;
+  }
+
+  .overlay-controls button {
+    margin: 0.3em;
+    padding: 0.4em 0.8em;
+    background: #1e90ff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .overlay-controls button:hover {
+    background: #3aa0ff;
+  }
+
+  .settings-popup {
+    position: absolute;
+    top: 60px;
+    left: 10px;
+    background: rgba(20, 20, 20, 0.95);
+    padding: 1em;
+    border-radius: 8px;
+    color: white;
+    display: none;
+    z-index: 20;
+  }
+
+  .settings-popup input[type=range] {
+    width: 100%;
+  }
+
+  .settings-popup select,
+  .settings-popup button {
+    margin-top: 0.5em;
+  }
+</style>
+
+<div id="streamContainer">
+  <img id="streamImage" src="{% url 'video_feed' %}?t={{ now|date:'U' }}" alt="Live Stream">
+
+  <div class="overlay-controls">
+    <p><strong>User:</strong> {{ request.user.username }}</p>
+    <p><strong>Zuschauer:</strong> {{ viewer_count }}</p>
+    <p><a href="{% url 'logout' %}" style="color: lightblue;">Logout</a></p>
+
+    <button onclick="startRecording()">⏺ Start</button>
+    <button onclick="stopRecording()">⏹ Stop</button>
+    <button onclick="autoAdjust()">🌞 Auto-Anpassen</button>
+    <button onclick="toggleSettings()">⚙️ Einstellungen</button>
+    <form method="post" action="{% url 'reset_camera' %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit">🔄 Reset</button>
+    </form>
+    <p id="recordStatus" style="margin-top:0.5em;"></p>
+  </div>
+
+  <div id="settingsPopup" class="settings-popup">
     <form method="POST" action="{% url 'update_camera_settings' %}">
-        {% csrf_token %}
- 
-        <input type="range" name="video_brightness" value="{{ settings.video_brightness }}">
-        <input type="range" name="video_contrast" value="{{ settings.video_contrast }}">
-        <input type="range" name="video_saturation" value="{{ settings.video_saturation }}">
-        <input type="range" name="video_exposure" value="{{ settings.video_exposure }}">
-        <input type="range" name="video_gain" value="{{ settings.video_gain }}">
-        <select name="video_exposure_mode">
-          <option value="manual" {% if settings.video_exposure_mode == 'manual' %}selected{% endif %}>Manuell</option>
-          <option value="auto" {% if settings.video_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
-        </select>
-    
-        <button type="submit">Übernehmen</button>
+      {% csrf_token %}
+      <label>Helligkeit</label>
+      <input type="range" name="video_brightness" min="0" max="1" step="0.01" value="{{ settings.video_brightness }}">
+      <label>Kontrast</label>
+      <input type="range" name="video_contrast" min="0" max="1" step="0.01" value="{{ settings.video_contrast }}">
+      <label>Sättigung</label>
+      <input type="range" name="video_saturation" min="0" max="1" step="0.01" value="{{ settings.video_saturation }}">
+      <label>Belichtung</label>
+      <input type="range" name="video_exposure" min="-13" max="0" step="0.1" value="{{ settings.video_exposure }}">
+      <label>Gain</label>
+      <input type="range" name="video_gain" min="0" max="10" step="0.1" value="{{ settings.video_gain }}">
+
+      <label>Belichtungsmodus</label>
+      <select name="video_exposure_mode">
+        <option value="manual" {% if settings.video_exposure_mode == 'manual' %}selected{% endif %}>Manuell</option>
+        <option value="auto" {% if settings.video_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
+      </select>
+
+      <button type="submit" style="margin-top:1em;">✅ Übernehmen</button>
     </form>
-
-
-    <form method="post" action="{% url 'reset_camera' %}">
-        {% csrf_token %}
-        <button type="submit">🔄 Kamera zurücksetzen</button>
-    </form>
-    
-    <button onclick="autoAdjust()">
-        🌞 Auto-Anpassen vom Livebild
-    </button>
-
-
-{% endif %}
+  </div>
+</div>
 
 <script>
+  function toggleSettings() {
+    const popup = document.getElementById("settingsPopup");
+    popup.style.display = popup.style.display === "block" ? "none" : "block";
+  }
 
-function updateRecordingStatus() {
-    fetch("{% url 'is_recording' %}")
-        .then(response => {
-            if (!response.ok) throw new Error(`Status ${response.status}`);
-            return response.json();
-        })
-        .then(data => {
-            console.log("[is_recording] response", data);
-            const el = document.getElementById("recordStatus");
-            el.innerText = data.recording ? "● Recording in progress" : "Not recording";
-            el.style.color = data.recording ? "red" : "black";
-        })
-        .catch(err => {
-            console.error("[is_recording] error", err);
-        });
-}
-
-
-
-setInterval(updateRecordingStatus, 3000);
-updateRecordingStatus();
-function autoAdjust(){
+  function autoAdjust() {
     fetch("{% url 'auto_photo_adjust' %}", {
-        method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-    }).then(r => r.json()).then(data => {
-        alert(data.status);
-        location.reload();
+      method: "POST",
+      headers: { "X-CSRFToken": "{{ csrf_token }}" }
     })
-}
-function startRecording() {
+    .then(res => res.json())
+    .then(data => {
+      alert(data.status);
+      location.reload();
+    });
+  }
+
+  function updateRecordingStatus() {
+    fetch("{% url 'is_recording' %}")
+      .then(r => r.json())
+      .then(data => {
+        const el = document.getElementById("recordStatus");
+        el.innerText = data.recording ? "● Aufnahme läuft" : "– nicht aktiv";
+        el.style.color = data.recording ? "red" : "white";
+      });
+  }
+
+  function startRecording() {
     fetch("{% url 'start_recording' %}", {
-    method: "POST",
-    headers: {'X-CSRFToken': '{{ csrf_token }}'}
-})
-.then(response => response.json())
-.then(data => {
-    console.log("Start Recording Response:", data);
-    updateRecordingStatus();
-});
-}
-
-function stopRecording() {
-    fetch("{% url 'stop_recording' %}", {
-        method: "POST",
-        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+      method: "POST",
+      headers: { "X-CSRFToken": "{{ csrf_token }}" }
     }).then(() => updateRecordingStatus());
-}
-</script>
+  }
 
+  function stopRecording() {
+    fetch("{% url 'stop_recording' %}", {
+      method: "POST",
+      headers: { "X-CSRFToken": "{{ csrf_token }}" }
+    }).then(() => updateRecordingStatus());
+  }
+
+  setInterval(updateRecordingStatus, 3000);
+  updateRecordingStatus();
+</script>
 {% endblock %}
