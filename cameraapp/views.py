@@ -415,42 +415,48 @@ def media_browser(request):
     return render(request, "cameraapp/media_browser.html", {"media_tree": media_tree, "title": "Media Browser"})
 
 
-
 @require_POST
 @login_required
 def update_camera_settings(request):
-    """Aktualisiert Video-Kameraeinstellungen aus einem POST-Formular und wendet sie an."""
+    """Aktualisiert Video-Kameraeinstellungen aus einem POST-Formular mit `video_`-Präfixen."""
     try:
         settings_obj = CameraSettings.objects.first()
-        if settings_obj:
-            for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-                value = request.POST.get(param)
-                if value is not None:
-                    try:
-                        setattr(settings_obj, f"video_{param}", float(value))
-                    except ValueError:
-                        print(f"[UPDATE_CAMERA_SETTINGS] Ungültiger Wert für {param}: {value}")
-                        continue
+        if not settings_obj:
+            print("[UPDATE_CAMERA_SETTINGS] Kein CameraSettings-Objekt gefunden.")
+            return HttpResponseRedirect(reverse("stream_page"))
 
-            exposure_mode = request.POST.get("video_exposure_mode")
-            if exposure_mode in ["auto", "manual"]:
-                settings_obj.video_exposure_mode = exposure_mode
+        print("[UPDATE_CAMERA_SETTINGS] Anfrage erhalten:", dict(request.POST))
 
+        for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+            raw = request.POST.get(f"video_{param}")
+            if raw is not None:
+                try:
+                    val = float(raw)
+                    setattr(settings_obj, f"video_{param}", val)
+                    print(f"[UPDATE_CAMERA_SETTINGS] Set video_{param} = {val}")
+                except ValueError:
+                    print(f"[UPDATE_CAMERA_SETTINGS] Ungültiger Wert für {param}: {raw}")
 
-            settings_obj.save()
+        exposure_mode = request.POST.get("video_exposure_mode")
+        if exposure_mode in ["auto", "manual"]:
+            settings_obj.video_exposure_mode = exposure_mode
+            print(f"[UPDATE_CAMERA_SETTINGS] Set video_exposure_mode = {exposure_mode}")
+        else:
+            print(f"[UPDATE_CAMERA_SETTINGS] Ungültiger exposure_mode: {exposure_mode}")
 
-            print("[UPDATE_CAMERA_SETTINGS] Neue Einstellungen gespeichert. Kamera wird neu initialisiert.")
+        settings_obj.save()
+        print("[UPDATE_CAMERA_SETTINGS] Einstellungen gespeichert.")
+
+        with camera_lock:
             if camera_instance and camera_instance.isOpened():
+                print("[UPDATE_CAMERA_SETTINGS] Alte Kamera-Instanz wird freigegeben.")
                 camera_instance.release()
             init_camera()
-        else:
-            print("[UPDATE_CAMERA_SETTINGS] Kein CameraSettings-Objekt vorhanden.")
 
     except Exception as e:
-        print(f"[UPDATE_CAMERA_SETTINGS] Fehler beim Aktualisieren der Kameraeinstellungen: {e}")
+        print(f"[UPDATE_CAMERA_SETTINGS] Fehler: {e}")
 
     return HttpResponseRedirect(reverse("stream_page"))
-
 
 
 
