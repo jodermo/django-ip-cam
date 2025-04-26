@@ -108,15 +108,32 @@ def video_feed(request):
 def stream_page(request):
     settings_obj = get_camera_settings_safe()
     camera_error = None
+
+    if request.method == "POST":
+        for field in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+            val = request.POST.get(field)
+            if val is not None:
+                try:
+                    setattr(settings_obj, field, float(val))
+                except ValueError:
+                    pass
+        settings_obj.save()
+        from .camera_core import init_camera
+        init_camera()  # Anwenden der neuen Settings
+
     if not livestream_job.running:
         livestream_job.start()
+
     if settings_obj is None:
         camera_error = "Settings not ready (DB table missing?)"
+
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
         "title": "Live Stream",
-        "viewer_count": active_stream_viewers
+        "viewer_count": active_stream_viewers,
+        "settings": settings_obj
     })
+
 
 @login_required
 def record_video(request):
@@ -241,7 +258,11 @@ def settings_view(request):
 class CameraSettingsForm(forms.ModelForm):
     class Meta:
         model = CameraSettings
-        fields = "__all__"
+        fields = '__all__'
+        widgets = {
+            'video_brightness': forms.NumberInput(attrs={'step': 0.1}),
+            'photo_brightness': forms.NumberInput(attrs={'step': 0.1}),
+        }
 
 @login_required
 def media_browser(request):
@@ -274,3 +295,5 @@ def media_browser(request):
         {"label": "Photos", "path": "/media/photos", "content": collect_files("/media/photos", PHOTO_DIR)}
     ]
     return render(request, "cameraapp/media_browser.html", {"media_tree": media_tree, "title": "Media Browser"})
+
+

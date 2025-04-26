@@ -16,6 +16,32 @@
         <button onclick="stopRecording()">Stop Recording</button>
     </div>
     <p id="recordStatus" style="font-weight: bold;"></p>
+
+    <form method="POST" action="{% url 'update_camera_settings' %}" style="margin-top: 20px;">
+        {% csrf_token %}
+        <fieldset>
+            <legend>Kameraeinstellungen</legend>
+    
+            <label>Helligkeit:</label>
+            <input type="number" step="0.1" name="brightness" value="{{ settings.brightness }}"><br>
+    
+            <label>Kontrast:</label>
+            <input type="number" step="0.1" name="contrast" value="{{ settings.contrast }}"><br>
+    
+            <label>Sättigung:</label>
+            <input type="number" step="0.1" name="saturation" value="{{ settings.saturation }}"><br>
+    
+            <label>Belichtung:</label>
+            <input type="number" step="0.1" name="exposure" value="{{ settings.exposure }}"><br>
+    
+            <label>Gain:</label>
+            <input type="number" step="0.1" name="gain" value="{{ settings.gain }}"><br>
+    
+            <button type="submit">Übernehmen</button>
+        </fieldset>
+    </form>
+
+    
 {% endif %}
 
 <script>

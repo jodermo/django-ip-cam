@@ -5,6 +5,7 @@ from datetime import datetime
 from django.conf import settings
 from django.apps import apps
 from django.db import connections
+from cameraapp.models import CameraSettings
 
 # Separat importiert, keine Abhängigkeit mehr zu views.py
 from .camera_core import init_camera  # falls notwendig, z. B. zum Zurücksetzen nach Foto
@@ -27,6 +28,8 @@ def take_photo():
     if not cap.isOpened():
         print("[PHOTO] Kamera konnte nicht geöffnet werden.")
         return
+    settings = get_camera_settings()
+    apply_camera_settings(cap, brightness=settings.photo_brightness, contrast=settings.photo_contrast)
 
     ret, frame = cap.read()
     if ret:
@@ -38,6 +41,19 @@ def take_photo():
         print("[PHOTO] Fehler beim Erfassen des Bildes.")
 
     cap.release()
+
+def apply_camera_settings(cap, settings, mode="photo"):
+    if settings is None or not cap.isOpened():
+        return
+
+    prefix = "photo_" if mode == "photo" else "video_"
+
+    for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+        value = getattr(settings, f"{prefix}{param}", -1)
+        if value >= 0:
+            cap.set(getattr(cv2, f"CAP_PROP_{param.upper()}"), value)
+            print(f"[SET] {param} = {value}")
+
 
 
 def wait_for_table(table_name, db_alias="default", timeout=30):

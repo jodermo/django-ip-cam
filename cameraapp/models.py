@@ -9,6 +9,7 @@ class Camera(models.Model):
         return self.name
 
 class CameraSettings(models.Model):
+
     # Slideshow / Stream
     interval_ms = models.PositiveIntegerField(default=3000)
     duration_sec = models.PositiveIntegerField(default=30)
@@ -29,6 +30,21 @@ class CameraSettings(models.Model):
     # Foto-Optionen
     photo_quality = models.PositiveIntegerField(default=95)  # JPEG Qualität (1-100)
     save_raw_photos = models.BooleanField(default=False)     # Speichert auch RAW-Bilder
+
+
+    # Video-Kameraeinstellungen
+    video_brightness = models.FloatField(default=-1.0)
+    video_contrast = models.FloatField(default=-1.0)
+    video_saturation = models.FloatField(default=-1.0)
+    video_exposure = models.FloatField(default=-1.0)
+    video_gain = models.FloatField(default=-1.0)
+
+    # Foto-Kameraeinstellungen
+    photo_brightness = models.FloatField(default=-1.0)
+    photo_contrast = models.FloatField(default=-1.0)
+    photo_saturation = models.FloatField(default=-1.0)
+    photo_exposure = models.FloatField(default=-1.0)
+    photo_gain = models.FloatField(default=-1.0)
 
     def __str__(self):
         return "Global Camera Settings"
