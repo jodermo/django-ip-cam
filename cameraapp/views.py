@@ -18,7 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-
+from .recording_job import RecordingJob
 
 
 from dotenv import load_dotenv
@@ -41,6 +41,7 @@ active_stream_viewers = 0
 last_disconnect_time = None
 disconnect_timeout_sec = 10  # Shutdown after 10 seconds of inactivity
 
+recording_job = None
 recording_thread = None
 recording_active = False
 recording_lock = threading.Lock()
@@ -349,21 +350,18 @@ def record_video(request):
     )
     codec = request.GET.get("codec", settings_obj.video_codec if settings_obj else "mp4v")
 
-    print(f"[RECORD_VIDEO] Params → Duration: {duration}s, FPS: {fps}, Resolution: {resolution}, Codec: {codec}")
-
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     filename = f"clip_{timestamp}.mp4"
     filepath = os.path.join(RECORD_DIR, filename)
-    print(f"[RECORD_VIDEO] Output file: {filepath}")
 
-    success = record_video_to_file(filepath, duration, fps, resolution, codec)
+    print(f"[RECORD_VIDEO] Async start to file: {filepath}")
 
-    if not success:
-        print("[RECORD_VIDEO] Failed to write video.")
-        return JsonResponse({"status": "error", "message": "Recording failed"}, status=500)
+    def async_record():
+        record_video_to_file(filepath, duration, fps, resolution, codec)
 
-    print("[RECORD_VIDEO] Successfully wrote video.")
-    return JsonResponse({"status": "ok", "file": filepath})
+    threading.Thread(target=async_record).start()
+
+    return JsonResponse({"status": "recording started", "file": filepath})
 
 
 
@@ -371,52 +369,39 @@ def record_video(request):
 @require_POST
 @login_required
 def start_recording(request):
-    print("[DEBUG] start_recording view triggered")
-    global recording_thread, recording_active
+    global recording_job
+
+    if recording_job and recording_job.active:
+        return JsonResponse({"status": "already recording"})
 
     settings_obj = get_camera_settings()
     duration = recording_timeout
     fps = settings_obj.record_fps if settings_obj else 20.0
     resolution = (
         settings_obj.resolution_width if settings_obj else 640,
-        settings_obj.resolution_height if settings_obj else 480
+        settings_obj.resolution_height if settings_obj else 480,
     )
     codec = settings_obj.video_codec if settings_obj else "mp4v"
+    filepath = os.path.join(RECORD_DIR, f"clip_{time.strftime('%Y%m%d-%H%M%S')}.mp4")
 
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    filename = f"clip_{timestamp}.mp4"
-    filepath = os.path.join(RECORD_DIR, filename)
+    def frame_provider():
+        return latest_frame.copy() if latest_frame is not None else None
 
-    print(f"[START_RECORDING] Start requested.")
-    print(f"[START_RECORDING] Output: {filepath}")
-    print(f"[START_RECORDING] Duration: {duration}, FPS: {fps}, Resolution: {resolution}, Codec: {codec}")
+    job = RecordingJob(
+        filepath=filepath,
+        duration=duration,
+        fps=fps,
+        resolution=resolution,
+        codec=codec,
+        frame_provider=frame_provider,
+        lock=latest_frame_lock
+    )
 
-    def record_with_timeout():
-        global recording_active
-        print("[RECORD_THREAD] Recording thread started.")
-        try:
-            success = record_video_to_file(filepath, duration, fps, resolution, codec)
-            if success:
-                print("[RECORD_THREAD] Recording completed successfully.")
-            else:
-                print("[RECORD_THREAD] Recording failed.")
-        except Exception as e:
-            print(f"[RECORD_THREAD] Exception: {e}")
-        finally:
-            with recording_lock:
-                recording_active = False
-                print("[RECORD_THREAD] Recording state set to inactive.")
+    recording_job = job
+    job.start()
 
-    with recording_lock:
-        if recording_active:
-            print("[START_RECORDING] Already recording. Abort.")
-            return JsonResponse({"status": "already recording"})
+    return JsonResponse({"status": "started", "file": filepath})
 
-        recording_active = True
-        recording_thread = threading.Thread(target=record_with_timeout)
-        recording_thread.start()
-
-    return JsonResponse({"status": "started"})
 
 
 
@@ -424,20 +409,19 @@ def start_recording(request):
 @require_POST
 @login_required
 def stop_recording(request):
-    global recording_active
-    with recording_lock:
-        recording_active = False
-    return JsonResponse({"status": "stopped"})
+    global recording_job
+    if recording_job and recording_job.active:
+        recording_job.stop()
+        return JsonResponse({"status": "stopping"})
+    return JsonResponse({"status": "not active"})
 
 
 @csrf_exempt
 @login_required
 def is_recording(request):
-    with recording_lock:
-        print(f"[IS_RECORDING] Called → State: {recording_active}")
-        return JsonResponse({"recording": recording_active})
-
-
+    global recording_job
+    state = recording_job.active if recording_job else False
+    return JsonResponse({"recording": state})
 
 
 @login_required
