@@ -294,6 +294,7 @@ def settings_view(request):
         "title": "Settings"
     })
 
+
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
     print(f"[RECORD_TO_FILE] Begin: {filepath}")
     print(f"[RECORD_TO_FILE] Params → Duration: {duration}, FPS: {fps}, Resolution: {resolution}, Codec: {codec}")
@@ -307,35 +308,38 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
             print("[RECORD_TO_FILE] Still no camera. Abort.")
             return False
 
-        print("[RECORD_TO_FILE] Camera OK. Creating VideoWriter...")
         fourcc = cv2.VideoWriter_fourcc(*codec)
         out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
-
         if not out.isOpened():
             print("[RECORD_TO_FILE] VideoWriter failed to open!")
             return False
 
-        frame_count = 0
-        start_time = time.time()
+    frame_count = 0
+    start_time = time.time()
 
-        while time.time() - start_time < duration:
-            frame = read_frame()
-            if frame is None:
-                print(f"[RECORD_TO_FILE] Frame {frame_count}: NULL")
-                continue
+    while time.time() - start_time < duration:
+        with camera_lock:
+            if not is_camera_open():
+                print("[RECORD_TO_FILE] Camera released during recording. Aborting.")
+                break
 
-            resized = cv2.resize(frame, resolution)
-            out.write(resized)
-            frame_count += 1
+        frame = read_frame()
+        if frame is None:
+            print(f"[RECORD_TO_FILE] Frame {frame_count}: NULL")
+            time.sleep(0.1)  # Kleine Pause bevor erneut versucht wird
+            continue
 
-            if frame_count % 10 == 0:
-                print(f"[RECORD_TO_FILE] Wrote {frame_count} frames...")
+        resized = cv2.resize(frame, resolution)
+        out.write(resized)
+        frame_count += 1
 
-        out.release()
-        print(f"[RECORD_TO_FILE] Finished. Total frames: {frame_count}")
+        if frame_count % 10 == 0:
+            print(f"[RECORD_TO_FILE] Wrote {frame_count} frames...")
+
+    out.release()
+    print(f"[RECORD_TO_FILE] Finished. Total frames: {frame_count}")
 
     return frame_count > 0
-
 
 
 @login_required
