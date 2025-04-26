@@ -318,3 +318,22 @@ def update_camera_settings(request):
         from .camera_core import init_camera
         init_camera()
     return HttpResponseRedirect(reverse("stream_page"))
+
+
+
+@login_required
+@csrf_exempt
+def update_photo_settings(request):
+    if request.method == "POST":
+        settings_obj = get_camera_settings()
+        for field in ["photo_brightness", "photo_contrast", "photo_saturation", "photo_exposure", "photo_gain"]:
+            val = request.POST.get(field)
+            if val is not None:
+                try:
+                    setattr(settings_obj, field, float(val))
+                except ValueError:
+                    pass
+        settings_obj.save()
+        from .camera_core import init_camera
+        init_camera()
+        return redirect("photo_gallery")
