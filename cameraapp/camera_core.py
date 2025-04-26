@@ -163,6 +163,10 @@ def apply_photo_settings(camera, settings):
     set_cv_param(camera, cv2.CAP_PROP_SATURATION, settings.photo_saturation)
     set_cv_param(camera, cv2.CAP_PROP_EXPOSURE, settings.photo_exposure)
     set_cv_param(camera, cv2.CAP_PROP_GAIN, settings.photo_gain)
+    if getattr(settings, "photo_exposure_mode", "manual") == "auto":
+        camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+    else:
+        camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
 
 def enable_auto_exposure(cap):
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)

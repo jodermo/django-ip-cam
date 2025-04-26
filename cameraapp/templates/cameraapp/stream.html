@@ -19,30 +19,21 @@
 
     <form method="POST" action="{% url 'update_camera_settings' %}">
         {% csrf_token %}
-        <label>Helligkeit:</label>
-        <input type="range" name="brightness" min="0" max="1" step="0.01" value="{{ settings.video_brightness }}">
-    
-        <label>Kontrast:</label>
-        <input type="range" name="contrast" min="0" max="1" step="0.01" value="{{ settings.video_contrast }}">
-    
-        <label>Sättigung:</label>
-        <input type="range" name="saturation" min="0" max="1" step="0.01" value="{{ settings.video_saturation }}">
-    
-        <label>Belichtung:</label>
-        <input type="range" name="exposure" min="-10" max="10" step="0.1" value="{{ settings.video_exposure }}">
-    
-        <label>Gain:</label>
-        <input type="range" name="gain" min="0" max="5" step="0.1" value="{{ settings.video_gain }}">
-    
-        <label>Belichtungsmodus:</label>
-        <select name="exposure_mode">
-            <option value="manual" {% if settings.video_exposure_mode == 'manual' %}selected{% endif %}>Manuell</option>
-            <option value="auto" {% if settings.video_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
+ 
+        <input type="range" name="video_brightness" value="{{ settings.video_brightness }}">
+        <input type="range" name="video_contrast" value="{{ settings.video_contrast }}">
+        <input type="range" name="video_saturation" value="{{ settings.video_saturation }}">
+        <input type="range" name="video_exposure" value="{{ settings.video_exposure }}">
+        <input type="range" name="video_gain" value="{{ settings.video_gain }}">
+        <select name="video_exposure_mode">
+          <option value="manual" {% if settings.video_exposure_mode == 'manual' %}selected{% endif %}>Manuell</option>
+          <option value="auto" {% if settings.video_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
         </select>
     
         <button type="submit">Übernehmen</button>
     </form>
-    
+
+
     
     
     <button onclick="autoAdjust()">

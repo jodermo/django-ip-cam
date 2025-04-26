@@ -141,15 +141,18 @@ def video_feed(request):
 def stream_page(request):
     settings_obj = get_camera_settings_safe()
     camera_error = None
+    if not camera_instance or not camera_instance.isOpened():
+        camera_error = "Kamera konnte nicht geöffnet werden. Prüfe Verbindung oder Einstellungen."
 
     if request.method == "POST":
         for field in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-            val = request.POST.get(field)
+            val = request.POST.get(f"video_{field}")
             if val is not None:
                 try:
-                    setattr(settings_obj, field, float(val))
+                    setattr(settings_obj, f"video_{field}", float(val))
                 except ValueError:
                     pass
+
         settings_obj.save()
         init_camera()  # Anwenden der neuen Settings
 
