@@ -299,34 +299,22 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
     print(f"[RECORD_TO_FILE] Begin: {filepath}")
     print(f"[RECORD_TO_FILE] Params → Duration: {duration}, FPS: {fps}, Resolution: {resolution}, Codec: {codec}")
 
-    with camera_lock:
-        if not is_camera_open():
-            print("[RECORD_TO_FILE] Camera not open. Trying to init.")
-            init_camera()
-
-        if not is_camera_open():
-            print("[RECORD_TO_FILE] Still no camera. Abort.")
-            return False
-
-        fourcc = cv2.VideoWriter_fourcc(*codec)
-        out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
-        if not out.isOpened():
-            print("[RECORD_TO_FILE] VideoWriter failed to open!")
-            return False
+    fourcc = cv2.VideoWriter_fourcc(*codec)
+    out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
+    if not out.isOpened():
+        print("[RECORD_TO_FILE] VideoWriter failed to open!")
+        return False
 
     frame_count = 0
     start_time = time.time()
 
     while time.time() - start_time < duration:
-        with camera_lock:
-            if not is_camera_open():
-                print("[RECORD_TO_FILE] Camera released during recording. Aborting.")
-                break
+        with latest_frame_lock:
+            frame = latest_frame.copy() if latest_frame is not None else None
 
-        frame = read_frame()
         if frame is None:
             print(f"[RECORD_TO_FILE] Frame {frame_count}: NULL")
-            time.sleep(0.1)  # Kleine Pause bevor erneut versucht wird
+            time.sleep(0.1)
             continue
 
         resized = cv2.resize(frame, resolution)
@@ -338,7 +326,6 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
 
     out.release()
     print(f"[RECORD_TO_FILE] Finished. Total frames: {frame_count}")
-
     return frame_count > 0
 
 
