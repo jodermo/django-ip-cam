@@ -22,31 +22,36 @@
         <fieldset>
             <legend>Kameraeinstellungen (Video)</legend>
     
-            <label>Helligkeit:</label>
-            <input type="number" step="0.1" name="brightness" value="{{ settings.video_brightness }}"><br>
+            <label>Helligkeit: <span id="video_brightness_val">{{ settings.video_brightness }}</span></label><br>
+            <input type="range" min="0" max="1" step="0.01" name="brightness"
+                   value="{{ settings.video_brightness }}" oninput="video_brightness_val.innerText = this.value"><br>
     
-            <label>Kontrast:</label>
-            <input type="number" step="0.1" name="contrast" value="{{ settings.video_contrast }}"><br>
+            <label>Kontrast: <span id="video_contrast_val">{{ settings.video_contrast }}</span></label><br>
+            <input type="range" min="0" max="1" step="0.01" name="contrast"
+                   value="{{ settings.video_contrast }}" oninput="video_contrast_val.innerText = this.value"><br>
     
-            <label>Sättigung:</label>
-            <input type="number" step="0.1" name="saturation" value="{{ settings.video_saturation }}"><br>
+            <label>Sättigung: <span id="video_saturation_val">{{ settings.video_saturation }}</span></label><br>
+            <input type="range" min="0" max="1" step="0.01" name="saturation"
+                   value="{{ settings.video_saturation }}" oninput="video_saturation_val.innerText = this.value"><br>
     
-            <label>Belichtung:</label>
-            <input type="number" step="0.1" name="exposure" value="{{ settings.video_exposure }}"><br>
+            <label>Belichtung: <span id="video_exposure_val">{{ settings.video_exposure }}</span></label><br>
+            <input type="range" min="-10" max="10" step="0.1" name="exposure"
+                   value="{{ settings.video_exposure }}" oninput="video_exposure_val.innerText = this.value"><br>
     
-            <label>Gain:</label>
-            <input type="number" step="0.1" name="gain" value="{{ settings.video_gain }}"><br>
+            <label>Gain: <span id="video_gain_val">{{ settings.video_gain }}</span></label><br>
+            <input type="range" min="0" max="1" step="0.01" name="gain"
+                   value="{{ settings.video_gain }}" oninput="video_gain_val.innerText = this.value"><br>
     
-            <button type="submit">Übernehmen</button>
+            <button type="submit" style="margin-top:10px;">Übernehmen</button>
         </fieldset>
     </form>
     
-    <button onclick="fetch('{% url 'auto_photo_adjust' %}', {
-        method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-    }).then(r => r.json()).then(data => alert(data.status))">
+    
+    <button onclick="autoAdjust()">
         🌞 Auto-Anpassen vom Livebild
     </button>
-    
+
+
 {% endif %}
 
 <script>
@@ -72,7 +77,14 @@ function updateRecordingStatus() {
 
 setInterval(updateRecordingStatus, 3000);
 updateRecordingStatus();
-
+function autoAdjust(){
+    fetch("{% url 'auto_photo_adjust' %}", {
+        method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    }).then(r => r.json()).then(data => {
+        alert(data.status);
+        location.reload();
+    })
+}
 function startRecording() {
     fetch("{% url 'start_recording' %}", {
     method: "POST",
