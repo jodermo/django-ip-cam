@@ -7,7 +7,8 @@
     
     # --- Working directory ---
     WORKDIR /app
-    
+    COPY cameraapp/static/video_fallback.png cameraapp/static/video_fallback.png
+
     # --- System dependencies (OpenCV + V4L2 support) ---
     RUN apt-get update && apt-get install -y \
     v4l-utils \

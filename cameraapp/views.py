@@ -85,7 +85,7 @@ def get_frame(self):
 def video_feed(request):
     def dummy_generator():
         while True:
-            img = cv2.imread("cameraapp/static/test.jpg")
+            img = cv2.imread("cameraapp/static/video_fallback.png")
             _, buffer = cv2.imencode(".jpg", img)
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" +
