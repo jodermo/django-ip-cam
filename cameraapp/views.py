@@ -151,6 +151,8 @@ def apply_video_settings(cap):
 def stream_page(request):
     settings_obj = get_camera_settings_safe()
     camera_error = None
+    if not camera_instance or not camera_instance.isOpened():
+        camera_error = "Camera could not be opened. Check connection or settings."
 
     if request.method == "POST":
         for field in ["brightness", "contrast", "saturation", "exposure", "gain"]:
@@ -162,11 +164,15 @@ def stream_page(request):
                     pass
 
         settings_obj.save()
+
+        # Stop stream before applying new settings
+        livestream_job.stop()
+        time.sleep(0.5)
+
         init_camera()
 
-        # Apply settings to OpenCV camera instance
-        if camera_instance and camera_instance.isOpened():
-            apply_video_settings(camera_instance)
+        # Restart stream after applying settings
+        livestream_job.start()
 
     if not livestream_job.running:
         livestream_job.start()
