@@ -4,9 +4,9 @@ import os
 import cv2
 import time
 from django.apps import apps
-from dotenv import load_dotenv
 from cameraapp.models import CameraSettings
-
+from .camera_core import try_open_camera, apply_cv_settings
+from dotenv import load_dotenv
 load_dotenv()
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
@@ -30,9 +30,14 @@ def try_open_camera(source, retries=3, delay=1.5):
     return None
 
 
+
+
+
 def init_camera():
     """Initialisiert die globale Kamera-Instanz mit gespeicherten Video-Settings."""
     global camera_instance
+    from .views import CAMERA_URL, CAMERA_URL_RAW
+
     print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
 
     if camera_instance:
@@ -41,13 +46,9 @@ def init_camera():
 
     print(f"[CAMERA_CORE] Attempting to open camera from source: {CAMERA_URL}")
     camera_instance = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
-    if not camera_instance:
-        print("[CAMERA_CORE] Failed to open camera after retries.")
-        return
-
 
     if not camera_instance or not camera_instance.isOpened():
-        print("[CAMERA_CORE] Failed to open camera.")
+        print("[CAMERA_CORE] Failed to open camera after retries.")
         return
 
     print("[CAMERA_CORE] Camera opened successfully.")
@@ -59,10 +60,26 @@ def init_camera():
             print("[CAMERA_CORE] No CameraSettings in DB.")
             return
 
+        # Set automatic or manual exposure mode
+        if hasattr(settings, "video_exposure_mode") and settings.video_exposure_mode == "auto":
+            print("[CAMERA_CORE] Setting exposure mode to AUTO.")
+            # Je nach Kamera und Backend: 0.75 = auto, 0.25 = manual (V4L2)
+            camera_instance.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+        else:
+            print("[CAMERA_CORE] Setting exposure mode to MANUAL.")
+            camera_instance.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+
+        # Apply all remaining settings
         apply_cv_settings(camera_instance, settings, mode="video")
 
     except Exception as e:
         print(f"[CAMERA_CORE] Exception while applying settings: {e}")
+
+
+
+def enable_auto_exposure(cap):
+    # 0 = auto, 1 = manual (bei vielen V4L2-Backends)
+    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)  # oder 0.25 je nach Backend
 
 
 def apply_cv_settings(cap, settings, mode="video"):
@@ -155,3 +172,10 @@ def auto_adjust_from_frame(frame, settings):
     print("[CAMERA_CORE] Auto-adjusted settings saved based on frame analysis.")
 
 
+# camera_core.py
+def apply_photo_settings(camera, settings):
+    set_cv_param(camera, cv2.CAP_PROP_BRIGHTNESS, settings.photo_brightness)
+    set_cv_param(camera, cv2.CAP_PROP_CONTRAST, settings.photo_contrast)
+    set_cv_param(camera, cv2.CAP_PROP_SATURATION, settings.photo_saturation)
+    set_cv_param(camera, cv2.CAP_PROP_EXPOSURE, settings.photo_exposure)
+    set_cv_param(camera, cv2.CAP_PROP_GAIN, settings.photo_gain)

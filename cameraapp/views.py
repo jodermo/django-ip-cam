@@ -1,29 +1,40 @@
+# default
 import os
 import cv2
 import time
 import threading
 import datetime
-from django.http import StreamingHttpResponse, HttpResponseServerError, JsonResponse
+import subprocess
+
+# Django
+from django.http import (
+    StreamingHttpResponse, HttpResponseServerError, JsonResponse,
+    HttpResponseRedirect
+)
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.urls import reverse
 from django.conf import settings
 from django import forms
-from .models import CameraSettings
 from django.apps import apps
 from django.db import connection
 from django.contrib.auth import logout
-import subprocess
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.safestring import mark_safe
-from django.views.decorators.http import require_POST
-from django.http import HttpResponseRedirect
-from django.urls import reverse
+
+# project
+from .models import CameraSettings
+from .camera_core import (
+    init_camera, camera_instance, apply_photo_settings,
+    apply_auto_settings, auto_adjust_from_frame, apply_cv_settings
+)
 from .recording_job import RecordingJob
 from .livestream_job import LiveStreamJob
 from .scheduler import take_photo
 
 from dotenv import load_dotenv
 load_dotenv()
+
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
 CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
@@ -89,6 +100,11 @@ def get_frame(self):
 
 @login_required
 def video_feed(request):
+
+    with camera_lock:
+        if not livestream_job.running:
+            livestream_job.start()
+
     if not livestream_job.running:
         livestream_job.start()
 
@@ -137,7 +153,6 @@ def stream_page(request):
                 except ValueError:
                     pass
         settings_obj.save()
-        from .camera_core import init_camera
         init_camera()  # Anwenden der neuen Settings
 
     if not livestream_job.running:
@@ -175,24 +190,55 @@ def record_video(request):
     return JsonResponse({"status": "recording started", "file": filepath})
 
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
-    print(f"[RECORD_TO_FILE] → {filepath}")
-    fourcc = cv2.VideoWriter_fourcc(*codec)
-    out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
-    if not out.isOpened():
+    """
+    Nimmt ein Video mit aktuellen Live-Frames auf und speichert es als Datei.
+
+    Args:
+        filepath (str): Zielpfad der Videodatei
+        duration (int): Aufnahmedauer in Sekunden
+        fps (float): Bilder pro Sekunde
+        resolution (tuple): Zielauflösung (Breite, Höhe)
+        codec (str): Video-Codec (z. B. 'mp4v', 'XVID', 'MJPG')
+
+    Returns:
+        bool: True, wenn mindestens ein Frame erfolgreich gespeichert wurde
+    """
+    print(f"[RECORD_TO_FILE] Start recording to {filepath} (duration={duration}s, fps={fps}, resolution={resolution})")
+
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
+        if not out.isOpened():
+            print(f"[RECORD_TO_FILE] Fehler: Kann Datei {filepath} nicht öffnen.")
+            return False
+
+        frame_count = 0
+        start_time = time.time()
+
+        while time.time() - start_time < duration:
+            with latest_frame_lock:
+                frame = latest_frame.copy() if latest_frame is not None else None
+
+            if frame is None:
+                time.sleep(0.05)
+                continue
+
+            resized_frame = cv2.resize(frame, resolution)
+            out.write(resized_frame)
+            frame_count += 1
+
+            time.sleep(1.0 / fps)  # Taktet exakt auf Ziel-FPS
+
+    except Exception as e:
+        print(f"[RECORD_TO_FILE] Ausnahme beim Schreiben: {e}")
         return False
 
-    frame_count = 0
-    start_time = time.time()
-    while time.time() - start_time < duration:
-        with latest_frame_lock:
-            frame = latest_frame.copy() if latest_frame is not None else None
-        if frame is None:
-            time.sleep(0.05)
-            continue
-        out.write(cv2.resize(frame, resolution))
-        frame_count += 1
-    out.release()
+    finally:
+        out.release()
+        print(f"[RECORD_TO_FILE] Aufzeichnung abgeschlossen: {frame_count} Frames gespeichert → {filepath}")
+
     return frame_count > 0
+
 
 @csrf_exempt
 @require_POST
@@ -283,6 +329,7 @@ class CameraSettingsForm(forms.ModelForm):
         widgets = {
             'video_brightness': forms.NumberInput(attrs={'step': 0.1}),
             'photo_brightness': forms.NumberInput(attrs={'step': 0.1}),
+            'video_exposure_mode': forms.Select(),
         }
 
 @login_required
@@ -319,43 +366,72 @@ def media_browser(request):
 
 
 
-
-
 @require_POST
 @login_required
 def update_camera_settings(request):
-    settings_obj = get_camera_settings()
-    if settings_obj:
-        for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-            value = request.POST.get(param)
-            if value is not None:
-                try:
-                    setattr(settings_obj, f"video_{param}", float(value))
-                except ValueError:
-                    continue
-        settings_obj.save()
-        from .camera_core import init_camera
-        init_camera()
+    """Aktualisiert Video-Kameraeinstellungen aus einem POST-Formular und wendet sie an."""
+    try:
+        settings_obj = CameraSettings.objects.first()
+        if settings_obj:
+            for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+                value = request.POST.get(param)
+                if value is not None:
+                    try:
+                        setattr(settings_obj, f"video_{param}", float(value))
+                    except ValueError:
+                        print(f"[UPDATE_CAMERA_SETTINGS] Ungültiger Wert für {param}: {value}")
+                        continue
+
+            # Optional: Belichtungsmodus setzen (auto/manuell)
+            exposure_mode = request.POST.get("exposure_mode")
+            if exposure_mode in ["auto", "manual"]:
+                settings_obj.video_exposure_mode = exposure_mode
+
+            settings_obj.save()
+
+            print("[UPDATE_CAMERA_SETTINGS] Neue Einstellungen gespeichert. Kamera wird neu initialisiert.")
+            init_camera()
+        else:
+            print("[UPDATE_CAMERA_SETTINGS] Kein CameraSettings-Objekt vorhanden.")
+
+    except Exception as e:
+        print(f"[UPDATE_CAMERA_SETTINGS] Fehler beim Aktualisieren der Kameraeinstellungen: {e}")
+
     return HttpResponseRedirect(reverse("stream_page"))
 
 
 
+
+@require_POST
 @login_required
-@csrf_exempt
 def update_photo_settings(request):
-    if request.method == "POST":
-        settings_obj = get_camera_settings()
-        for field in ["photo_brightness", "photo_contrast", "photo_saturation", "photo_exposure", "photo_gain"]:
-            val = request.POST.get(field)
-            if val is not None:
-                try:
-                    setattr(settings_obj, field, float(val))
-                except ValueError:
-                    pass
-        settings_obj.save()
-        from .camera_core import init_camera
-        init_camera()
-        return redirect("photo_gallery")
+    """Aktualisiert Foto-Kameraeinstellungen aus dem Formular."""
+    try:
+        settings_obj = CameraSettings.objects.first()
+        if settings_obj:
+            for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+                value = request.POST.get(f"photo_{param}")
+                if value is not None:
+                    try:
+                        setattr(settings_obj, f"photo_{param}", float(value))
+                    except ValueError:
+                        print(f"[UPDATE_PHOTO_SETTINGS] Ungültiger Wert für {param}: {value}")
+                        continue
+
+            settings_obj.save()
+            print("[UPDATE_PHOTO_SETTINGS] Fotoeinstellungen gespeichert.")
+
+            # init_camera() // only for videos
+            # apply_photo_settings(camera_instance, settings_obj)
+
+        else:
+            print("[UPDATE_PHOTO_SETTINGS] Kein CameraSettings-Objekt gefunden.")
+
+    except Exception as e:
+        print(f"[UPDATE_PHOTO_SETTINGS] Fehler beim Speichern der Fotoeinstellungen: {e}")
+
+    return HttpResponseRedirect(reverse("photo_settings_page"))  # Ziel-View anpassen
+
 
 
 def pause_livestream():
@@ -386,7 +462,6 @@ def resume_livestream():
 @require_POST
 @login_required
 def take_photo_now(request):
-    from .views import pause_livestream, resume_livestream
     with camera_lock:
         pause_livestream()
         try:
@@ -401,19 +476,16 @@ def take_photo_now(request):
 @require_POST
 @login_required
 def auto_photo_settings(request):
-    settings = get_camera_settings()
-    if settings:
-        from .camera_core import init_camera, apply_auto_settings
-        apply_auto_settings(settings)
-        init_camera()
-        return JsonResponse({"status": "auto settings applied"})
-    return JsonResponse({"status": "error"}, status=500)
+    settings = CameraSettings.objects.first()
+    if not settings:
+        return JsonResponse({"success": False, "message": "Keine Kameraeinstellungen gefunden."})
 
+    apply_auto_settings(settings)
+    return JsonResponse({"success": True, "message": "Autoeinstellungen angewendet."})
 
 @require_POST
 @login_required
 def auto_photo_adjust(request):
-    from .camera_core import auto_adjust_from_frame, apply_cv_settings
     settings = get_camera_settings()
 
     if not settings:
@@ -445,3 +517,10 @@ def auto_photo_adjust(request):
     auto_adjust_from_frame(temp_frame, settings)
     return JsonResponse({"status": "adjusted from temp photo"})
 
+@login_required
+def photo_settings_page(request):
+    settings_obj = get_camera_settings()
+    return render(request, "cameraapp/photo_settings.html", {
+        "settings": settings_obj,
+        "title": "Foto-Einstellungen"
+    })

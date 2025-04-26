@@ -46,6 +46,15 @@ class CameraSettings(models.Model):
     photo_exposure = models.FloatField(default=-1.0)
     photo_gain = models.FloatField(default=-1.0)
 
+
+    EXPOSURE_MODES = [
+        ("auto", "Auto"),
+        ("manual", "Manuell"),
+    ]
+
+    video_exposure_mode = models.CharField(max_length=10, choices=EXPOSURE_MODES, default="manual")
+
+
     def __str__(self):
         return "Global Camera Settings"
 

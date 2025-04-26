@@ -17,34 +17,32 @@
     </div>
     <p id="recordStatus" style="font-weight: bold;"></p>
 
-    <form method="POST" action="{% url 'update_camera_settings' %}" style="margin-top: 20px;">
+    <form method="POST" action="{% url 'update_camera_settings' %}">
         {% csrf_token %}
-        <fieldset>
-            <legend>Kameraeinstellungen (Video)</legend>
+        <label>Helligkeit:</label>
+        <input type="range" name="brightness" min="0" max="1" step="0.01" value="{{ settings.video_brightness }}">
     
-            <label>Helligkeit: <span id="video_brightness_val">{{ settings.video_brightness }}</span></label><br>
-            <input type="range" min="0" max="1" step="0.01" name="brightness"
-                   value="{{ settings.video_brightness }}" oninput="video_brightness_val.innerText = this.value"><br>
+        <label>Kontrast:</label>
+        <input type="range" name="contrast" min="0" max="1" step="0.01" value="{{ settings.video_contrast }}">
     
-            <label>Kontrast: <span id="video_contrast_val">{{ settings.video_contrast }}</span></label><br>
-            <input type="range" min="0" max="1" step="0.01" name="contrast"
-                   value="{{ settings.video_contrast }}" oninput="video_contrast_val.innerText = this.value"><br>
+        <label>Sättigung:</label>
+        <input type="range" name="saturation" min="0" max="1" step="0.01" value="{{ settings.video_saturation }}">
     
-            <label>Sättigung: <span id="video_saturation_val">{{ settings.video_saturation }}</span></label><br>
-            <input type="range" min="0" max="1" step="0.01" name="saturation"
-                   value="{{ settings.video_saturation }}" oninput="video_saturation_val.innerText = this.value"><br>
+        <label>Belichtung:</label>
+        <input type="range" name="exposure" min="-10" max="10" step="0.1" value="{{ settings.video_exposure }}">
     
-            <label>Belichtung: <span id="video_exposure_val">{{ settings.video_exposure }}</span></label><br>
-            <input type="range" min="-10" max="10" step="0.1" name="exposure"
-                   value="{{ settings.video_exposure }}" oninput="video_exposure_val.innerText = this.value"><br>
+        <label>Gain:</label>
+        <input type="range" name="gain" min="0" max="5" step="0.1" value="{{ settings.video_gain }}">
     
-            <label>Gain: <span id="video_gain_val">{{ settings.video_gain }}</span></label><br>
-            <input type="range" min="0" max="1" step="0.01" name="gain"
-                   value="{{ settings.video_gain }}" oninput="video_gain_val.innerText = this.value"><br>
+        <label>Belichtungsmodus:</label>
+        <select name="exposure_mode">
+            <option value="manual" {% if settings.video_exposure_mode == 'manual' %}selected{% endif %}>Manuell</option>
+            <option value="auto" {% if settings.video_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
+        </select>
     
-            <button type="submit" style="margin-top:10px;">Übernehmen</button>
-        </fieldset>
+        <button type="submit">Übernehmen</button>
     </form>
+    
     
     
     <button onclick="autoAdjust()">
