@@ -24,42 +24,51 @@ def try_open_camera(source, retries=3, delay=1.5):
     print("[CAMERA] Failed to open camera after retries.")
     return None
 
+from cameraapp.views import camera_lock  # oben einfügen
+
 def init_camera():
     global camera_instance
     from cameraapp.models import CameraSettings
 
-    print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
+    with camera_lock:
+        print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
 
-    if camera_instance:
-        print("[CAMERA_CORE] Releasing previous camera instance.")
-        camera_instance.release()
+        if camera_instance:
+            print("[CAMERA_CORE] Releasing previous camera instance.")
+            camera_instance.release()
 
-    print(f"[CAMERA_CORE] Attempting to open camera from source: {CAMERA_URL}")
-    camera_instance = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
+        print(f"[CAMERA_CORE] Attempting to open camera from source: {CAMERA_URL}")
+        camera_instance = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
 
-    if not camera_instance or not camera_instance.isOpened():
-        print("[CAMERA_CORE] Failed to open camera after retries.")
-        return
-
-    print("[CAMERA_CORE] Camera opened successfully.")
-
-    try:
-        settings = CameraSettings.objects.first()
-        if not settings:
-            print("[CAMERA_CORE] No CameraSettings in DB.")
+        if not camera_instance or not camera_instance.isOpened():
+            print("[CAMERA_CORE] Failed to open camera after retries.")
             return
 
-        if hasattr(settings, "video_exposure_mode") and settings.video_exposure_mode == "auto":
-            print("[CAMERA_CORE] Setting exposure mode to AUTO.")
-            camera_instance.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
-        else:
-            print("[CAMERA_CORE] Setting exposure mode to MANUAL.")
-            camera_instance.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        print("[CAMERA_CORE] Camera opened successfully.")
 
-        apply_cv_settings(camera_instance, settings, mode="video", reopen_callback=lambda: try_open_camera(CAMERA_URL))
+        try:
+            settings = CameraSettings.objects.first()
+            if not settings:
+                print("[CAMERA_CORE] No CameraSettings in DB.")
+                return
 
-    except Exception as e:
-        print(f"[CAMERA_CORE] Exception while applying settings: {e}")
+            if getattr(settings, "video_exposure_mode", "manual") == "auto":
+                print("[CAMERA_CORE] Setting exposure mode to AUTO.")
+                camera_instance.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+            else:
+                print("[CAMERA_CORE] Setting exposure mode to MANUAL.")
+                camera_instance.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+
+            apply_cv_settings(
+                camera_instance,
+                settings,
+                mode="video",
+                reopen_callback=lambda: try_open_camera(CAMERA_URL)
+            )
+
+        except Exception as e:
+            print(f"[CAMERA_CORE] Exception while applying settings: {e}")
+
 
 def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     if not settings:

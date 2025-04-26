@@ -87,6 +87,7 @@ def get_camera_settings_safe():
     return CameraSettings.objects.first()
 
 
+
 @login_required
 @csrf_exempt
 def reboot_pi(request):
@@ -98,9 +99,10 @@ def reboot_pi(request):
         return render(request, "cameraapp/rebooting.html")
     return redirect("settings_view")
 
+
+
 @login_required
 def video_feed(request):
-
     with camera_lock:
         if not livestream_job.running:
             livestream_job.start()
@@ -113,7 +115,6 @@ def video_feed(request):
                 time.sleep(0.1)
                 frame_fail_count += 1
                 if frame_fail_count > 100:
-                    print("[VIDEO_FEED] No frames received for 10 seconds. Aborting stream.")
                     break
                 continue
 
@@ -130,17 +131,30 @@ def video_feed(request):
         return StreamingHttpResponse(stream_generator(),
             content_type="multipart/x-mixed-replace; boundary=frame")
     except Exception as e:
-        print(f"[VIDEO_FEED] Streaming error: {e}")
         return HttpResponseServerError("Streaming error")
 
 
+def apply_video_settings(cap):
+    settings = CameraSettings.objects.first()
+    if not cap or not cap.isOpened() or not settings:
+        return
 
+    cap.set(cv2.CAP_PROP_BRIGHTNESS, settings.video_brightness)
+    cap.set(cv2.CAP_PROP_CONTRAST, settings.video_contrast)
+    cap.set(cv2.CAP_PROP_SATURATION, settings.video_saturation)
+    cap.set(cv2.CAP_PROP_EXPOSURE, settings.video_exposure)
+    cap.set(cv2.CAP_PROP_GAIN, settings.video_gain)
+
+    # Optionally log actual values
+    print("[VIDEO] Set brightness =", settings.video_brightness, "→ actual =", cap.get(cv2.CAP_PROP_BRIGHTNESS))
 
 
 @login_required
 def stream_page(request):
     settings_obj = get_camera_settings_safe()
     camera_error = None
+    if not camera_instance or not camera_instance.isOpened():
+        camera_error = "Camera could not be opened. Check connection or settings."
 
     if request.method == "POST":
         for field in ["brightness", "contrast", "saturation", "exposure", "gain"]:
@@ -152,13 +166,17 @@ def stream_page(request):
                     pass
 
         settings_obj.save()
-        init_camera()  # Anwenden der neuen Settings
+        init_camera()
+
+        # Apply settings to OpenCV camera instance
+        if camera_instance and camera_instance.isOpened():
+            apply_video_settings(camera_instance)
 
     if not livestream_job.running:
         livestream_job.start()
 
     if settings_obj is None:
-        camera_error = "Settings not ready (DB table missing?)"
+        camera_error = "Settings not ready"
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
