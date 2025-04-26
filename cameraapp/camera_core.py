@@ -88,7 +88,7 @@ def apply_cv_settings(cap, settings, mode="video"):
 
     prefix = "video_" if mode == "video" else "photo_"
 
-    def apply_param(prop, name):
+    def apply_param(cap, name):
         value = getattr(settings, f"{prefix}{name}", -1)
         cap_prop = getattr(cv2, f"CAP_PROP_{name.upper()}")
         ok = cap.set(cap_prop, value)
@@ -96,9 +96,9 @@ def apply_cv_settings(cap, settings, mode="video"):
         print(f"[CAMERA_CORE] {mode.upper()} Set {name} to {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
 
 
-
     for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
         apply_param(cap, param)
+
 
 
 def apply_camera_settings(cap, brightness=None, contrast=None):
