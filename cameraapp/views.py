@@ -84,14 +84,19 @@ def is_camera_open():
     return camera_instance and camera_instance.isOpened()
 
 def read_frame():
+    global camera_instance
     with camera_lock:
         if not is_camera_open():
             print("[READ_FRAME] Camera not open, trying to reinitialize...")
             init_camera()
             if not is_camera_open():
+                print("[READ_FRAME] Reinitialization failed.")
                 return None
         ret, frame = camera_instance.read()
+        if not ret:
+            print("[READ_FRAME] Failed to read frame.")
         return frame if ret else None
+
 
 
 def gen_frames():
@@ -137,13 +142,15 @@ def gen_frames():
 
 
 def delayed_camera_release():
-    global last_disconnect_time
+    global last_disconnect_time, camera_instance
     time.sleep(disconnect_timeout_sec)
     with camera_lock:
         if active_stream_viewers == 0 and last_disconnect_time and (time.time() - last_disconnect_time >= disconnect_timeout_sec):
             print("[CAMERA] No viewers for a while. Releasing camera.")
             if camera_instance:
                 camera_instance.release()
+                camera_instance = None  # <--- Wichtig
+
 
 
 @login_required
