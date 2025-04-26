@@ -20,7 +20,6 @@
 
 <script>
 function updateRecordingStatus() {
-    function updateRecordingStatus() {
     fetch("{% url 'is_recording' %}")
         .then(response => response.json())
         .then(data => {
