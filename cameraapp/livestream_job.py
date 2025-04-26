@@ -27,9 +27,17 @@ class LiveStreamJob:
     def start(self):
         if self.running:
             return
+        self.capture = cv2.VideoCapture(self.camera_source)
+        if not self.capture.isOpened():
+            print("[LIVE_STREAM_JOB] Error: Unable to open camera.")
+            self.capture.release()
+            self.capture = None
+            self.running = False
+            return  # <--- notwendig
         self.running = True
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
+
 
     def stop(self):
         with self.lock:

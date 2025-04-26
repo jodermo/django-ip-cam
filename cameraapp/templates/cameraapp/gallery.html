@@ -54,6 +54,13 @@
 
 <button onclick="takePhoto()" style="margin-top: 10px;">📷 Manuelles Foto aufnehmen</button>
 
+
+<button onclick="fetch('{% url 'auto_photo_adjust' %}', {
+    method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+}).then(r => r.json()).then(data => alert(data.status))">
+    🌞 Auto-Anpassen vom Livebild
+</button>
+
     <script>
         const photos = {{ photos|safe }};
         let index = 0;

@@ -41,6 +41,11 @@
         </fieldset>
     </form>
     
+    <button onclick="fetch('{% url 'auto_photo_adjust' %}', {
+        method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    }).then(r => r.json()).then(data => alert(data.status))">
+        🌞 Auto-Anpassen vom Livebild
+    </button>
     
 {% endif %}
 

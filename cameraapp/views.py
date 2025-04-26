@@ -380,3 +380,18 @@ def auto_photo_settings(request):
         init_camera()
         return JsonResponse({"status": "auto settings applied"})
     return JsonResponse({"status": "error"}, status=500)
+
+
+@require_POST
+@login_required
+def auto_photo_adjust(request):
+    from .camera_core import auto_adjust_from_frame
+    settings = get_camera_settings()
+    with latest_frame_lock:
+        frame = latest_frame.copy() if latest_frame is not None else None
+    if settings and frame is not None:
+        auto_adjust_from_frame(frame, settings)
+        from .camera_core import init_camera
+        init_camera()
+        return JsonResponse({"status": "auto adjusted from live frame"})
+    return JsonResponse({"status": "no frame available"}, status=500)

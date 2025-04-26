@@ -27,9 +27,10 @@ def take_photo():
     cap = cv2.VideoCapture(camera_url)
     if not cap.isOpened():
         print("[PHOTO] Kamera konnte nicht geöffnet werden.")
-        return
+        return False
     settings = get_camera_settings()
-    apply_camera_settings(cap, settings=settings, mode="photo")
+    from .camera_core import apply_cv_settings
+    apply_cv_settings(cap, settings, mode="photo")
 
     ret, frame = cap.read()
     if ret:
