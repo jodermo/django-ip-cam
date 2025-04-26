@@ -78,24 +78,21 @@ def reboot_pi(request):
         return render(request, "cameraapp/rebooting.html")
     return redirect("settings_view")
 
+def get_frame(self):
+    return self.frame
+
 @login_required
 def video_feed(request):
-    if not livestream_job.running:
-        livestream_job.start()
-
-    def frame_generator():
+    def dummy_generator():
         while True:
-            frame = livestream_job.get_frame()
-            if frame is None:
-                time.sleep(0.1)
-                continue
-            _, buffer = cv2.imencode(".jpg", frame)
+            img = cv2.imread("cameraapp/static/test.jpg")
+            _, buffer = cv2.imencode(".jpg", img)
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" +
                    buffer.tobytes() + b"\r\n")
+            time.sleep(0.2)
+    return StreamingHttpResponse(dummy_generator(), content_type="multipart/x-mixed-replace; boundary=frame")
 
-    return StreamingHttpResponse(frame_generator(),
-        content_type="multipart/x-mixed-replace; boundary=frame")
 
 @login_required
 def stream_page(request):
