@@ -22,7 +22,7 @@
 function updateRecordingStatus() {
     const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-    fetch("{% url 'start_recording' %}", {
+    fetch("{% url 'is_recording' %}", {
         method: "POST",
         headers: {
             'X-CSRFToken': csrftoken,
