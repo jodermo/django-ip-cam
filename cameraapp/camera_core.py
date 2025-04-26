@@ -5,7 +5,6 @@ import cv2
 import time
 from django.apps import apps
 from cameraapp.models import CameraSettings
-from .camera_core import try_open_camera, apply_cv_settings
 from dotenv import load_dotenv
 load_dotenv()
 
