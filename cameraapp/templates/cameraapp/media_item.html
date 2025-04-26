@@ -1,20 +1,24 @@
 <li>
     {% if item.type == "dir" %}
-      <strong>{{ item.name }}/</strong>
+      <div class="folder-label"><strong>{{ item.name }}/</strong></div>
       <ul>
         {% for child in item.children %}
           {% include "cameraapp/media_item.html" with item=child %}
         {% endfor %}
       </ul>
     {% elif item.type == "image" %}
-      <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
-      <img src="{{ item.url }}" width="320" style="margin-bottom: 10px;" />
+      <div class="file-entry">
+        <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
+        <img src="{{ item.url }}" width="320" style="margin-bottom: 10px;" />
+      </div>
     {% elif item.type == "video" %}
-      <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
-      <video width="320" controls style="margin-bottom: 10px;">
-        <source src="{{ item.url }}" type="video/mp4">
-        Your browser does not support the video tag.
-      </video>
+      <div class="file-entry">
+        <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
+        <video width="320" controls style="margin-bottom: 10px;">
+          <source src="{{ item.url }}" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      </div>
     {% endif %}
   </li>
   
