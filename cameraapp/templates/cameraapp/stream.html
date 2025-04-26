@@ -5,6 +5,7 @@
 <p>Angemeldet als: {{ request.user.username }}</p>
 <p><a href="{% url 'logout' %}">Logout</a></p>
 <meta name="csrf-token" content="{{ csrf_token }}">
+
 {% if camera_error %}
     <p style="color: red;">Error: {{ camera_error }}</p>
 {% else %}
@@ -14,28 +15,41 @@
         <button onclick="startRecording()">Start Recording</button>
         <button onclick="stopRecording()">Stop Recording</button>
     </div>
-    <p id="recordStatus"></p>
+    <p id="recordStatus" style="font-weight: bold;"></p>
 {% endif %}
 
 <script>
+function updateRecordingStatus() {
+    fetch("{% url 'is_recording' %}")
+        .then(response => response.json())
+        .then(data => {
+            const el = document.getElementById("recordStatus");
+            if (data.recording) {
+                el.innerText = "● Recording in progress";
+                el.style.color = "red";
+            } else {
+                el.innerText = "Not recording";
+                el.style.color = "black";
+            }
+        });
+}
+
+setInterval(updateRecordingStatus, 3000);
+updateRecordingStatus();
+
 function startRecording() {
     fetch("{% url 'start_recording' %}", {
         method: "POST",
         headers: {'X-CSRFToken': '{{ csrf_token }}'}
-    }).then(response => response.json())
-      .then(data => {
-        document.getElementById("recordStatus").innerText = "Recording started";
-    });
+    }).then(() => updateRecordingStatus());
 }
 
 function stopRecording() {
     fetch("{% url 'stop_recording' %}", {
         method: "POST",
         headers: {'X-CSRFToken': '{{ csrf_token }}'}
-    }).then(response => response.json())
-      .then(data => {
-        document.getElementById("recordStatus").innerText = "Recording stopped";
-    });
+    }).then(() => updateRecordingStatus());
 }
 </script>
+
 {% endblock %}
