@@ -419,8 +419,9 @@ def media_browser(request):
 @require_POST
 @login_required
 def update_camera_settings(request):
-    global camera_instance  # ← ganz nach oben
-
+    global camera_instance
+    global livestream_job 
+    
     try:
         settings_obj = CameraSettings.objects.first()
         if settings_obj:
