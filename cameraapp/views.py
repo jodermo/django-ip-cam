@@ -20,6 +20,7 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from .recording_job import RecordingJob
 from .livestream_job import LiveStreamJob
+from .scheduler import take_photo
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -337,3 +338,10 @@ def update_photo_settings(request):
         from .camera_core import init_camera
         init_camera()
         return redirect("photo_gallery")
+
+
+@require_POST
+@login_required
+def take_photo_now(request):
+    take_photo()
+    return JsonResponse({"status": "ok"})

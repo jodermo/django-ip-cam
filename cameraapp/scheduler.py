@@ -42,17 +42,20 @@ def take_photo():
 
     cap.release()
 
-def apply_camera_settings(cap, settings, mode="photo"):
+def apply_camera_settings(cap, settings, mode="video"):
     if settings is None or not cap.isOpened():
         return
 
     prefix = "photo_" if mode == "photo" else "video_"
 
-    for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-        value = getattr(settings, f"{prefix}{param}", -1)
+    def apply_param(prop, attr):
+        value = getattr(settings, f"{prefix}{attr}", -1)
         if value >= 0:
-            cap.set(getattr(cv2, f"CAP_PROP_{param.upper()}"), value)
-            print(f"[SET] {param} = {value}")
+            ok = cap.set(getattr(cv2, f"CAP_PROP_{attr.upper()}"), value)
+            print(f"[CAMERA_CORE] {mode.upper()} Set {attr} to {value} → {'OK' if ok else 'FAIL'}")
+
+    for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+        apply_param(cv2, param)
 
 
 
