@@ -1,13 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
-    <h1>Live Kamera</h1>
-    <p>Angemeldet als: {{ request.user.username }}</p>
-    <p><a href="{% url 'logout' %}">Logout</a></p>
-    {% if camera_error %}
+<h1>Live Kamera</h1>
+<p>Angemeldet als: {{ request.user.username }}</p>
+<p><a href="{% url 'logout' %}">Logout</a></p>
+
+{% if camera_error %}
     <p style="color: red;">Error: {{ camera_error }}</p>
-    {% else %}
+{% else %}
+    <p><strong>Aktive Zuschauer:</strong> {{ viewer_count }}</p>
     <img src="{% url 'video_feed' %}" width="640" height="480" alt="Live Stream">
-    {% endif %}
-</body>
-</html>
+    <div style="margin-top:10px;">
+        <button onclick="startRecording()">Start Recording</button>
+        <button onclick="stopRecording()">Stop Recording</button>
+    </div>
+    <p id="recordStatus"></p>
+{% endif %}
+
+<script>
+function startRecording() {
+    fetch("{% url 'start_recording' %}", {
+        method: "POST",
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    }).then(response => response.json())
+      .then(data => {
+        document.getElementById("recordStatus").innerText = "Recording started";
+    });
+}
+
+function stopRecording() {
+    fetch("{% url 'stop_recording' %}", {
+        method: "POST",
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    }).then(response => response.json())
+      .then(data => {
+        document.getElementById("recordStatus").innerText = "Recording stopped";
+    });
+}
+</script>
 {% endblock %}

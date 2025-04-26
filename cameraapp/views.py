@@ -14,6 +14,12 @@ from django.db import connection
 from django.contrib.auth import logout
 import subprocess
 from django.views.decorators.csrf import csrf_exempt
+
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+
+
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -34,6 +40,10 @@ active_stream_viewers = 0
 last_disconnect_time = None
 disconnect_timeout_sec = 10  # Shutdown after 10 seconds of inactivity
 
+recording_thread = None
+recording_active = False
+recording_lock = threading.Lock()
+recording_timeout = 30  # Sekunden Fallback
 
 def logout_view(request):
     logout(request)
@@ -187,7 +197,8 @@ def stream_page(request):
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
-        "title": "Live Stream"
+        "title": "Live Stream",
+        "viewer_count": active_stream_viewers  # <-- HIER
     })
 
 
@@ -267,3 +278,42 @@ def settings_view(request):
         "form": form,
         "title": "Settings"
     })
+
+
+
+
+
+@csrf_exempt
+@require_POST
+@login_required
+def start_recording(request):
+    global recording_thread, recording_active
+
+    def record_with_timeout():
+        nonlocal recording_active
+        print("[RECORD] Recording started.")
+        start_time = time.time()
+        try:
+            record_video(request)
+        finally:
+            with recording_lock:
+                recording_active = False
+                print("[RECORD] Recording stopped.")
+    
+    with recording_lock:
+        if recording_active:
+            return JsonResponse({"status": "already recording"})
+        recording_active = True
+        recording_thread = threading.Thread(target=record_with_timeout)
+        recording_thread.start()
+
+    return JsonResponse({"status": "started"})
+
+@csrf_exempt
+@require_POST
+@login_required
+def stop_recording(request):
+    global recording_active
+    with recording_lock:
+        recording_active = False
+    return JsonResponse({"status": "stopped"})
