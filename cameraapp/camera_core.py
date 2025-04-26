@@ -72,6 +72,13 @@ def init_camera():
 
 
 def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
+
+    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+
+    # TEST: explizit alle Werte auf -1 (default/reset)
+    for p in ["BRIGHTNESS", "CONTRAST", "SATURATION", "EXPOSURE", "GAIN"]:
+        cap.set(getattr(cv2, f"CAP_PROP_{p}"), -1)
+
     return
     if not settings:
         print("[CAMERA_CORE] Keine Einstellungen übergeben.")
