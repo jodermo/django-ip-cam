@@ -72,6 +72,7 @@ def init_camera():
 
 
 def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
+    return
     if not settings:
         print("[CAMERA_CORE] Keine Einstellungen übergeben.")
         return
@@ -122,6 +123,7 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
 
 
 def apply_camera_settings(cap, brightness=None, contrast=None):
+    return
     if cap and cap.isOpened():
         if brightness is not None:
             cap.set(cv2.CAP_PROP_BRIGHTNESS, brightness)
