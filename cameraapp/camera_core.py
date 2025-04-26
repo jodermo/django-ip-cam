@@ -2,6 +2,8 @@ import os
 import cv2
 import time
 from django.apps import apps
+from .globals import camera_lock, latest_frame, latest_frame_lock
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -24,7 +26,6 @@ def try_open_camera(source, retries=3, delay=1.5):
     print("[CAMERA] Failed to open camera after retries.")
     return None
 
-from cameraapp.views import camera_lock  # oben einfügen
 
 def init_camera():
     global camera_instance

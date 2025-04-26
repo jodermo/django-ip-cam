@@ -32,6 +32,7 @@ from .camera_core import (
 from .recording_job import RecordingJob
 from .livestream_job import LiveStreamJob
 from .scheduler import take_photo
+from .globals import camera_lock, latest_frame, latest_frame_lock
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -47,11 +48,8 @@ os.makedirs(RECORD_DIR, exist_ok=True)
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
 # Globals
-camera_lock = threading.Lock()
 active_stream_viewers = 0
 last_disconnect_time = None
-latest_frame = None
-latest_frame_lock = threading.Lock()
 recording_job = None
 recording_timeout = 30
 
