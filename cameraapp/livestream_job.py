@@ -167,3 +167,9 @@ class LiveStreamJob:
             return self.latest_frame.copy() if self.latest_frame is not None else None
 
 
+livestream_job = None
+
+def init_stream_job(camera_source, frame_callback=None):
+    global livestream_job
+    livestream_job = LiveStreamJob(camera_source, frame_callback)
+    return livestream_job

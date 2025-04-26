@@ -6,8 +6,10 @@ import threading
 import datetime
 import subprocess
 # views.py
-from cameraapp.live_stream_job import livestream_job
+from cameraapp.live_stream_job import livestream_job, init_stream_job
 
+if livestream_job is None:
+    init_stream_job(0)
 # Django
 from django.http import (
     StreamingHttpResponse, HttpResponseServerError, JsonResponse,
