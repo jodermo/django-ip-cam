@@ -414,9 +414,12 @@ def media_browser(request):
     ]
     return render(request, "cameraapp/media_browser.html", {"media_tree": media_tree, "title": "Media Browser"})
 
+
 @require_POST
 @login_required
 def update_camera_settings(request):
+    global camera_instance  # ← ganz nach oben
+
     try:
         settings_obj = CameraSettings.objects.first()
         if settings_obj:
@@ -438,6 +441,7 @@ def update_camera_settings(request):
 
             settings_obj.save()
             print("[UPDATE_CAMERA_SETTINGS] Einstellungen gespeichert.")
+
         else:
             print("[UPDATE_CAMERA_SETTINGS] Kein CameraSettings-Objekt vorhanden.")
             return HttpResponseRedirect(reverse("stream_page"))
@@ -446,7 +450,6 @@ def update_camera_settings(request):
         print(f"[UPDATE_CAMERA_SETTINGS] Fehler beim Speichern: {e}")
         return HttpResponseRedirect(reverse("stream_page"))
 
-    # --- Nur EINMAL Livestream neu starten ---
     with camera_lock:
         livestream_job.stop()
         time.sleep(1.0)
@@ -457,7 +460,6 @@ def update_camera_settings(request):
 
         new_cap = try_open_camera(CAMERA_URL)
         if new_cap and new_cap.isOpened():
-            global camera_instance
             camera_instance = new_cap
             apply_cv_settings(camera_instance, settings_obj, mode="video")
             print("[UPDATE_CAMERA_SETTINGS] Kamera neu konfiguriert.")
@@ -468,6 +470,7 @@ def update_camera_settings(request):
         print("[UPDATE_CAMERA_SETTINGS] Livestream neu gestartet.")
 
     return HttpResponseRedirect(reverse("stream_page"))
+
 
 
 
