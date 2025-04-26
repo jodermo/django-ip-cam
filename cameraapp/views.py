@@ -55,7 +55,7 @@ recording_timeout = 30
 
 # Stream Job
 livestream_job = LiveStreamJob(
-    camera_source=CAMERA_URL,
+    camera_url=CAMERA_URL,
     frame_callback=lambda f: update_latest_frame(f)
 )
 

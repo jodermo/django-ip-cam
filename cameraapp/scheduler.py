@@ -101,3 +101,8 @@ class LiveStreamJob(threading.Thread):
 
     def stop(self):
         self.running = False
+
+    def restart(self):
+        self.stop()
+        time.sleep(1.0)
+        self.start()
