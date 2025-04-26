@@ -29,7 +29,7 @@ def take_photo():
         print("[PHOTO] Kamera konnte nicht geöffnet werden.")
         return
     settings = get_camera_settings()
-    apply_camera_settings(cap, brightness=settings.photo_brightness, contrast=settings.photo_contrast)
+    apply_camera_settings(cap, settings=settings, mode="photo")
 
     ret, frame = cap.read()
     if ret:

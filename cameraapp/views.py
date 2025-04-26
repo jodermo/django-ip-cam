@@ -243,8 +243,10 @@ def photo_gallery(request):
         "duration": settings_obj.duration_sec if settings_obj else 30,
         "autoplay": settings_obj.auto_play if settings_obj else False,
         "overlay": settings_obj.overlay_timestamp if settings_obj else True,
+        "settings": settings_obj,  # <- fehlt in deiner Version
         "title": "Gallery"
     })
+
 
 @login_required
 def settings_view(request):
