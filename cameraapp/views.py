@@ -76,6 +76,7 @@ def logout_view(request):
 def get_camera_settings():
     return CameraSettings.objects.first()
 
+
 def get_camera_settings_safe():
     try:
         with connection.cursor() as cursor:
@@ -84,6 +85,7 @@ def get_camera_settings_safe():
         return None
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
+
 
 @login_required
 @csrf_exempt
@@ -110,7 +112,7 @@ def video_feed(request):
             if frame is None:
                 time.sleep(0.1)
                 frame_fail_count += 1
-                if frame_fail_count > 100:  # ca. 10 Sekunden keine Frames
+                if frame_fail_count > 100:
                     print("[VIDEO_FEED] No frames received for 10 seconds. Aborting stream.")
                     break
                 continue
@@ -122,7 +124,7 @@ def video_feed(request):
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" +
                    buffer.tobytes() + b"\r\n")
-            time.sleep(0.03)  # Limit auf ~30fps
+            time.sleep(0.03)
 
     try:
         return StreamingHttpResponse(stream_generator(),
@@ -130,6 +132,7 @@ def video_feed(request):
     except Exception as e:
         print(f"[VIDEO_FEED] Streaming error: {e}")
         return HttpResponseServerError("Streaming error")
+
 
 
 
