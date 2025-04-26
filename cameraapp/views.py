@@ -281,7 +281,49 @@ def settings_view(request):
     })
 
 
+def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
+    with camera_lock:
+        if not is_camera_open():
+            init_camera()
+        if not is_camera_open():
+            print("[RECORD] Cannot open camera.")
+            return False
 
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
+
+        start = time.time()
+        while time.time() - start < duration:
+            frame = read_frame()
+            if frame is None:
+                print("[RECORD] Frame read failed.")
+                break
+            out.write(cv2.resize(frame, resolution))
+
+        out.release()
+        print("[RECORD] Recording complete.")
+        return True
+
+@login_required
+def record_video(request):
+    settings_obj = get_camera_settings()
+    duration = int(request.GET.get("duration", settings_obj.duration_sec if settings_obj else 5))
+    fps = float(request.GET.get("fps", settings_obj.record_fps if settings_obj else 20.0))
+    resolution = (
+        int(request.GET.get("width", settings_obj.resolution_width if settings_obj else 640)),
+        int(request.GET.get("height", settings_obj.resolution_height if settings_obj else 480)),
+    )
+    codec = request.GET.get("codec", settings_obj.video_codec if settings_obj else "mp4v")
+
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    filename = f"clip_{timestamp}.mp4"
+    filepath = os.path.join(RECORD_DIR, filename)
+
+    success = record_video_to_file(filepath, duration, fps, resolution, codec)
+    if not success:
+        return JsonResponse({"status": "error", "message": "Recording failed"}, status=500)
+
+    return JsonResponse({"status": "ok", "file": filepath})
 
 
 @csrf_exempt
@@ -290,18 +332,29 @@ def settings_view(request):
 def start_recording(request):
     global recording_thread, recording_active
 
+    settings_obj = get_camera_settings()
+    duration = recording_timeout  # Fallback
+    fps = settings_obj.record_fps if settings_obj else 20.0
+    resolution = (
+        settings_obj.resolution_width if settings_obj else 640,
+        settings_obj.resolution_height if settings_obj else 480
+    )
+    codec = settings_obj.video_codec if settings_obj else "mp4v"
+
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    filename = f"clip_{timestamp}.mp4"
+    filepath = os.path.join(RECORD_DIR, filename)
+
     def record_with_timeout():
         global recording_active
         print("[RECORD] Recording started.")
-        start_time = time.time()
         try:
-            record_video(request)
+            record_video_to_file(filepath, duration, fps, resolution, codec)
         finally:
             with recording_lock:
                 recording_active = False
                 print("[RECORD] Recording stopped.")
 
-    
     with recording_lock:
         if recording_active:
             return JsonResponse({"status": "already recording"})
@@ -310,6 +363,7 @@ def start_recording(request):
         recording_thread.start()
 
     return JsonResponse({"status": "started"})
+
 
 @csrf_exempt
 @require_POST
