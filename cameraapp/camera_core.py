@@ -92,6 +92,15 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
 
     prefix = "video_" if mode == "video" else "photo_"
 
+    # ---- AUTO EXPOSURE ----
+    exposure_mode = getattr(settings, f"{prefix}exposure_mode", "manual")
+    if exposure_mode == "auto":
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)  # Auto-Modus
+        print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = AUTO")
+    else:
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # Manuell
+        print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = MANUAL")
+
     def apply_param(cap, name):
         try:
             value = float(getattr(settings, f"{prefix}{name}", None))
@@ -111,6 +120,7 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
         apply_param(cap, param)
 
+
 def apply_camera_settings(cap, brightness=None, contrast=None):
     if cap and cap.isOpened():
         if brightness is not None:
@@ -121,13 +131,23 @@ def apply_camera_settings(cap, brightness=None, contrast=None):
 def apply_video_settings(capture):
     from cameraapp.models import CameraSettings
     settings = CameraSettings.objects.first()
-    if settings:
-        for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-            value = getattr(settings, f"video_{param}", -1)
-            if value >= 0:
-                ok = capture.set(getattr(cv2, f"CAP_PROP_{param.upper()}"), value)
-                actual = capture.get(getattr(cv2, f"CAP_PROP_{param.upper()}"))
-                print(f"[VIDEO] Set {param} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
+    if not capture or not settings or not capture.isOpened():
+        return
+
+    if settings.video_exposure_mode == "auto":
+        capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+        print("[VIDEO] Auto-Exposure aktiviert")
+    else:
+        capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        print("[VIDEO] Manuelle Belichtung aktiviert")
+
+    for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+        value = getattr(settings, f"video_{param}", -1)
+        if value >= 0:
+            ok = capture.set(getattr(cv2, f"CAP_PROP_{param.upper()}"), value)
+            actual = capture.get(getattr(cv2, f"CAP_PROP_{param.upper()}"))
+            print(f"[VIDEO] Set {param} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
+
 
 def apply_auto_settings(settings):
     settings.photo_brightness = -1

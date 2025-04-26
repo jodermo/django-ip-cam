@@ -10,7 +10,19 @@
     <p style="color: red;">Error: {{ camera_error }}</p>
 {% else %}
     <p><strong>Aktive Zuschauer:</strong> {{ viewer_count }}</p>
-    <img src="{% url 'video_feed' %}?t={{ now|date:'U' }}" width="1920" height="1080" alt="Live Stream">
+    <img id="streamImage" src="{% url 'video_feed' %}?t={{ now|date:'U' }}" width="960" height="540" alt="Live Stream">
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+          const form = document.querySelector("form[action='{% url 'update_camera_settings' %}']");
+          const img = document.getElementById("streamImage");
+          if (form && img) {
+            form.addEventListener("submit", () => {
+              img.src = "";  // Stoppt den MJPEG-Stream
+            });
+          }
+        });
+        </script>
+        
     <div style="margin-top:10px;">
         <button onclick="startRecording()">Start Recording</button>
         <button onclick="stopRecording()">Stop Recording</button>

@@ -146,7 +146,6 @@ def apply_video_settings(cap):
     # Optionally log actual values
     print("[VIDEO] Set brightness =", settings.video_brightness, "→ actual =", cap.get(cv2.CAP_PROP_BRIGHTNESS))
 
-
 @login_required
 def stream_page(request):
     settings_obj = get_camera_settings_safe()
@@ -160,23 +159,24 @@ def stream_page(request):
                     setattr(settings_obj, f"video_{field}", float(val))
                 except ValueError:
                     pass
-
         settings_obj.save()
 
-        # Stop stream before applying new settings
-        livestream_job.stop()
-        time.sleep(0.5)
+        # Sicher stoppen (Livestream und Kamera freigeben)
+        with camera_lock:
+            livestream_job.stop()
+            time.sleep(1.0)
 
-        init_camera()
+            if camera_instance and camera_instance.isOpened():
+                camera_instance.release()
 
-        # Restart stream after applying settings
-        livestream_job.start()
+            init_camera()
+            livestream_job.start()
 
     if not livestream_job.running:
         livestream_job.start()
 
-    if settings_obj is None:
-        camera_error = "Settings not ready"
+    if not camera_instance or not camera_instance.isOpened():
+        camera_error = "Camera could not be opened. Check connection or settings."
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
@@ -423,10 +423,10 @@ def update_camera_settings(request):
                         print(f"[UPDATE_CAMERA_SETTINGS] Ungültiger Wert für {param}: {value}")
                         continue
 
-            # Optional: Belichtungsmodus setzen (auto/manuell)
-            exposure_mode = request.POST.get("exposure_mode")
+            exposure_mode = request.POST.get("video_exposure_mode")
             if exposure_mode in ["auto", "manual"]:
                 settings_obj.video_exposure_mode = exposure_mode
+
 
             settings_obj.save()
 
@@ -448,7 +448,6 @@ def update_camera_settings(request):
 @require_POST
 @login_required
 def update_photo_settings(request):
-    """Aktualisiert Foto-Kameraeinstellungen aus dem Formular."""
     try:
         settings_obj = CameraSettings.objects.first()
         if not settings_obj:
@@ -464,16 +463,12 @@ def update_photo_settings(request):
                     print(f"[UPDATE_PHOTO_SETTINGS] Ungültiger Wert für {param}: {value}")
                     continue
 
-        # OPTIONAL: Belichtungsmodus auch für Foto speichern (falls du es implementierst)
         exposure_mode = request.POST.get("photo_exposure_mode")
         if exposure_mode in ["auto", "manual"]:
-            setattr(settings_obj, "photo_exposure_mode", exposure_mode)
+            settings_obj.photo_exposure_mode = exposure_mode
 
         settings_obj.save()
         print("[UPDATE_PHOTO_SETTINGS] Fotoeinstellungen gespeichert.")
-
-        # Optional anwenden:
-        # apply_photo_settings(camera_instance, settings_obj)
 
     except Exception as e:
         print(f"[UPDATE_PHOTO_SETTINGS] Fehler beim Speichern der Fotoeinstellungen: {e}")
