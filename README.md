@@ -126,6 +126,10 @@ sudo chmod +x /usr/local/bin/reboot-host.sh
     http://localhost:8000/
     ```
 
+
+
+
+
 ### Run migrations manually (optional)
 
 ```bash
@@ -214,4 +218,11 @@ docker-compose stop nginx
 Renew cert
 ```bash
 docker-compose run --rm certbot renew
+```
+
+
+```bash
+docker-compose exec web python manage.py makemigrations
+docker-compose exec web python manage.py migrate
+
 ```

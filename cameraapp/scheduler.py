@@ -5,10 +5,7 @@ from datetime import datetime
 from django.conf import settings
 from django.apps import apps
 from django.db import connections
-from cameraapp.models import CameraSettings
-
-# Separat importiert, keine Abhängigkeit mehr zu views.py
-from .camera_core import init_camera  # falls notwendig, z. B. zum Zurücksetzen nach Foto
+from .camera_core import apply_cv_settings
 
 # Fotoverzeichnis sicherstellen
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
@@ -29,7 +26,7 @@ def take_photo():
         print("[PHOTO] Kamera konnte nicht geöffnet werden.")
         return False
     settings = get_camera_settings()
-    from .camera_core import apply_cv_settings
+
     apply_cv_settings(cap, settings, mode="photo")
 
     ret, frame = cap.read()
