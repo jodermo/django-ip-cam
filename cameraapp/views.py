@@ -30,8 +30,8 @@ from .camera_core import (
     apply_auto_settings, auto_adjust_from_frame, apply_cv_settings
 )
 from .recording_job import RecordingJob
-# importiere später nur bei Bedarf innerhalb der Funktion
-# oder lagere get_camera_settings nach camera_core.py aus
+from cameraapp.scheduler import LiveStreamJob
+
 from .scheduler import take_photo
 from .globals import camera_lock, latest_frame, latest_frame_lock
 

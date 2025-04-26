@@ -1,3 +1,5 @@
+# cameraapp/scheduler.py
+import threading
 import os
 import time
 import cv2
@@ -66,3 +68,19 @@ def start_photo_scheduler():
         else:
             interval_min = 15  # Default: alle 15 Minuten
         time.sleep(interval_min * 60)
+
+
+
+
+class LiveStreamJob(threading.Thread):
+    def __init__(self, camera_url):
+        super().__init__(daemon=True)
+        self.camera_url = camera_url
+        self.running = False
+
+    def run(self):
+        self.running = True
+        # hier deine Stream-Logik
+
+    def stop(self):
+        self.running = False
