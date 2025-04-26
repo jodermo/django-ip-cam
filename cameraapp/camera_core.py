@@ -40,7 +40,7 @@ def init_camera():
 
     print(f"[CAMERA_CORE] Attempting to open camera from source: {CAMERA_URL}")
     camera_instance = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
-
+    print("[CAMERA_CORE] Checking support for CAP_PROP_EXPOSURE:", camera_instance.get(cv2.CAP_PROP_EXPOSURE))
     if not camera_instance or not camera_instance.isOpened():
         print("[CAMERA_CORE] Failed to open camera after retries.")
         return
@@ -89,10 +89,20 @@ def apply_cv_settings(cap, settings, mode="video"):
     prefix = "video_" if mode == "video" else "photo_"
 
     def apply_param(cap, name):
-        value = getattr(settings, f"{prefix}{name}", -1)
-        cap_prop = getattr(cv2, f"CAP_PROP_{name.upper()}")
+        value = float(value)
+        cap_prop = getattr(cv2, f"CAP_PROP_{name.upper()}", None)
+
+        if cap_prop is None:
+            print(f"[WARNING] Unknown property: {name}")
+            return
+
         ok = cap.set(cap_prop, value)
         actual = cap.get(cap_prop)
+        if not ok or abs(actual - value) > 0.01:
+            print(f"[WARNING] Failed to set {name}: tried {value}, got {actual}")
+        else:
+            print(f"[OK] Set {name}: {value}")
+
         print(f"[CAMERA_CORE] {mode.upper()} Set {name} to {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
 
 

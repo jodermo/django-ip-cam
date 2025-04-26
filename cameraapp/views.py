@@ -26,7 +26,7 @@ from django.contrib.auth import logout
 # project
 from .models import CameraSettings
 from .camera_core import (
-    init_camera, camera_instance, apply_photo_settings,
+    init_camera, cap, camera_instance, apply_photo_settings,
     apply_auto_settings, auto_adjust_from_frame, apply_cv_settings
 )
 from .recording_job import RecordingJob
@@ -409,6 +409,8 @@ def update_camera_settings(request):
             settings_obj.save()
 
             print("[UPDATE_CAMERA_SETTINGS] Neue Einstellungen gespeichert. Kamera wird neu initialisiert.")
+            if cap and cap.isOpened():
+                cap.release()
             init_camera()
         else:
             print("[UPDATE_CAMERA_SETTINGS] Kein CameraSettings-Objekt vorhanden.")
