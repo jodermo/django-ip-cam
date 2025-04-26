@@ -151,8 +151,6 @@ def apply_video_settings(cap):
 def stream_page(request):
     settings_obj = get_camera_settings_safe()
     camera_error = None
-    if not camera_instance or not camera_instance.isOpened():
-        camera_error = "Camera could not be opened. Check connection or settings."
 
     if request.method == "POST":
         for field in ["brightness", "contrast", "saturation", "exposure", "gain"]:
