@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
+
 <h1>Live Kamera</h1>
 <p>Angemeldet als: {{ request.user.username }}</p>
 <p><a href="{% url 'logout' %}">Logout</a></p>
-
+<meta name="csrf-token" content="{{ csrf_token }}">
 {% if camera_error %}
     <p style="color: red;">Error: {{ camera_error }}</p>
 {% else %}
