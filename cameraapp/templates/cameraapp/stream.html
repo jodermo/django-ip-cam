@@ -19,15 +19,24 @@
 {% endif %}
 
 <script>
+
 function updateRecordingStatus() {
     fetch("{% url 'is_recording' %}")
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+            return response.json();
+        })
         .then(data => {
+            console.log("[is_recording] response", data);
             const el = document.getElementById("recordStatus");
             el.innerText = data.recording ? "● Recording in progress" : "Not recording";
             el.style.color = data.recording ? "red" : "black";
+        })
+        .catch(err => {
+            console.error("[is_recording] error", err);
         });
 }
+
 
 
 setInterval(updateRecordingStatus, 3000);
@@ -35,9 +44,14 @@ updateRecordingStatus();
 
 function startRecording() {
     fetch("{% url 'start_recording' %}", {
-        method: "POST",
-        headers: {'X-CSRFToken': '{{ csrf_token }}'}
-    }).then(() => updateRecordingStatus());
+    method: "POST",
+    headers: {'X-CSRFToken': '{{ csrf_token }}'}
+})
+.then(response => response.json())
+.then(data => {
+    console.log("Start Recording Response:", data);
+    updateRecordingStatus();
+});
 }
 
 function stopRecording() {
