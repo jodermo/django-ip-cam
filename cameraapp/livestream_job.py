@@ -1,7 +1,7 @@
 import threading
 import time
 from .camera_core import try_open_camera, apply_cv_settings
-from .views import get_camera_settings
+from .utils import get_camera_settings
 
 class LiveStreamJob:
     def __init__(self, camera_source, frame_callback=None):
