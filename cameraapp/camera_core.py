@@ -103,9 +103,7 @@ def reset_to_default():
 
     threading.Thread(target=delayed_reinit).start()
 
-
 def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
-
     if not settings:
         print("[CAMERA_CORE] Keine Einstellungen übergeben.")
         return
@@ -126,23 +124,25 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
 
     prefix = "video_" if mode == "video" else "photo_"
 
-    # ---- AUTO EXPOSURE ----
+    # ---- Auto-Exposure setzen ----
     exposure_mode = getattr(settings, f"{prefix}exposure_mode", "manual")
     if exposure_mode == "auto":
-        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)  # Auto-Modus
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)  # Auto-Modus V4L2
         print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = AUTO")
     else:
-        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # Manuell
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # Manuell-Modus V4L2
         print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = MANUAL")
+        time.sleep(0.1)  # manche Kameras brauchen das nach Umschaltung
 
-    def apply_param(cap, name):
+    def apply_param(name, min_valid=-1.0, max_valid=100.0):
         try:
             value = float(getattr(settings, f"{prefix}{name}", None))
-            if value == -1:
-                print(f"[CAMERA_CORE] {name} skipped (-1)")
-                return
         except (TypeError, ValueError):
             print(f"[WARNING] Ungültiger Wert für {prefix}{name}")
+            return
+
+        if value < 0:
+            print(f"[CAMERA_CORE] {name} deaktiviert (value={value})")
             return
 
         cap_prop = getattr(cv2, f"CAP_PROP_{name.upper()}", None)
@@ -150,18 +150,23 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
             print(f"[WARNING] Unbekannte OpenCV-Eigenschaft: {name}")
             return
 
+        if not (min_valid <= value <= max_valid):
+            print(f"[WARNING] {name} außerhalb gültigem Bereich ({value}) – wird ignoriert.")
+            return
+
         ok = cap.set(cap_prop, value)
         actual = cap.get(cap_prop)
         print(f"[CAMERA_CORE] {mode.upper()} Set {name} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
 
+    # Werte setzen
+    apply_param("brightness", 0.0, 1.0)
+    apply_param("contrast", 0.0, 1.0)
+    apply_param("saturation", 0.0, 1.0)
+    apply_param("gain", 0.0, 10.0)
 
-        ok = cap.set(cap_prop, value)
-        actual = cap.get(cap_prop)
-        print(f"[CAMERA_CORE] {mode.upper()} Set {name} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
-
-
-    for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-        apply_param(cap, param)
+    if exposure_mode == "manual":
+        # Für viele Kameras gültig: -1 bis -13 (kleiner = dunkler)
+        apply_param("exposure", -13.0, -1.0)
 
 
 def apply_camera_settings(cap, brightness=None, contrast=None):
