@@ -438,28 +438,34 @@ def update_camera_settings(request):
 
             settings_obj.save()
             print("[UPDATE_CAMERA_SETTINGS] Einstellungen gespeichert.")
-
-            # WICHTIG: Kamera + Stream sauber neu starten
-            with camera_lock:
-                from .views import livestream_job  # sicherstellen, dass es der richtige Job ist
-                if livestream_job.running:
-                    livestream_job.stop()
-                    print("[UPDATE_CAMERA_SETTINGS] Livestream gestoppt.")
-                    time.sleep(1.0)
-
-                if camera_instance and camera_instance.isOpened():
-                    camera_instance.release()
-                    print("[UPDATE_CAMERA_SETTINGS] Kamera freigegeben.")
-
-                init_camera()
-                livestream_job.start()
-                print("[UPDATE_CAMERA_SETTINGS] Livestream neu gestartet.")
-
         else:
             print("[UPDATE_CAMERA_SETTINGS] Kein CameraSettings-Objekt vorhanden.")
+            return HttpResponseRedirect(reverse("stream_page"))
 
     except Exception as e:
-        print(f"[UPDATE_CAMERA_SETTINGS] Fehler beim Aktualisieren: {e}")
+        print(f"[UPDATE_CAMERA_SETTINGS] Fehler beim Speichern: {e}")
+        return HttpResponseRedirect(reverse("stream_page"))
+
+    # --- Nur EINMAL Livestream neu starten ---
+    with camera_lock:
+        livestream_job.stop()
+        time.sleep(1.0)
+
+        if camera_instance and camera_instance.isOpened():
+            camera_instance.release()
+            print("[UPDATE_CAMERA_SETTINGS] Kamera freigegeben.")
+
+        new_cap = try_open_camera(CAMERA_URL)
+        if new_cap and new_cap.isOpened():
+            global camera_instance
+            camera_instance = new_cap
+            apply_cv_settings(camera_instance, settings_obj, mode="video")
+            print("[UPDATE_CAMERA_SETTINGS] Kamera neu konfiguriert.")
+        else:
+            print("[UPDATE_CAMERA_SETTINGS] Kamera konnte nicht erneut geöffnet werden.")
+
+        livestream_job.start()
+        print("[UPDATE_CAMERA_SETTINGS] Livestream neu gestartet.")
 
     return HttpResponseRedirect(reverse("stream_page"))
 

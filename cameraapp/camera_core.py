@@ -112,12 +112,12 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
         print("[CAMERA_CORE] Kamera nicht geöffnet. Versuche Neustart...")
 
         if reopen_callback:
-            cap = reopen_callback()
-            if not cap or not cap.isOpened():
-                print("[CAMERA_CORE] Kamera-Neustart fehlgeschlagen.")
-                return
-            else:
+            new_cap = reopen_callback()
+            if new_cap and new_cap.isOpened():
+                cap = new_cap
+                camera_instance = cap  # <--- DAS FEHLTE
                 print("[CAMERA_CORE] Kamera erfolgreich neu geöffnet.")
+                
         else:
             print("[CAMERA_CORE] Kein reopen_callback definiert – Abbruch.")
             return
@@ -136,7 +136,15 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
 
     def apply_param(name, min_valid=-1.0, max_valid=100.0):
         try:
-            value = float(getattr(settings, f"{prefix}{name}", None))
+            raw = getattr(settings, f"{prefix}{name}", None)
+            if raw is None:
+                return
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                print(f"[WARNING] Ungültiger Wert für {prefix}{name}: {raw}")
+                return
+
         except (TypeError, ValueError):
             print(f"[WARNING] Ungültiger Wert für {prefix}{name}")
             return
@@ -159,9 +167,9 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
         print(f"[CAMERA_CORE] {mode.upper()} Set {name} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
 
     # Werte setzen
-    apply_param("brightness", 0.0, 1.0)
-    apply_param("contrast", 0.0, 1.0)
-    apply_param("saturation", 0.0, 1.0)
+    apply_param("brightness", 0.0, 255.0)
+    apply_param("contrast", 0.0, 255.0)
+    apply_param("saturation", 0.0, 255.0)
     apply_param("gain", 0.0, 10.0)
 
     if exposure_mode == "manual":
@@ -197,13 +205,15 @@ def apply_video_settings(cap):
 
 
 def apply_auto_settings(settings):
+    settings.photo_exposure_mode = "auto"
     settings.photo_brightness = -1
     settings.photo_contrast = -1
     settings.photo_saturation = -1
     settings.photo_exposure = -1
     settings.photo_gain = -1
     settings.save()
-    print("[CAMERA_CORE] Auto photo settings applied (static defaults)")
+    print("[CAMERA_CORE] Auto photo settings applied (mode=auto, all = -1)")
+
 
 def auto_adjust_from_frame(frame, settings):
     if frame is None or settings is None:

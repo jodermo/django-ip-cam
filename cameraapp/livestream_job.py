@@ -1,6 +1,6 @@
 import threading
 import time
-
+from .camera_core import try_open_camera, apply_cv_settings, get_camera_settings
 
 class LiveStreamJob:
     def __init__(self, camera_source, frame_callback=None):
@@ -36,7 +36,8 @@ class LiveStreamJob:
             print("[LIVE_STREAM_JOB] Attempting to reconnect camera...")
             cap = try_open_camera(self.camera_source, retries=retry_limit, delay=retry_delay)
             if cap and cap.isOpened():
-                apply_video_settings(cap)
+                settings = get_camera_settings()
+                apply_cv_settings(cap, settings, mode="video")
                 print("[LIVE_STREAM_JOB] Reconnection successful.")
                 return cap
             print("[LIVE_STREAM_JOB] Reconnection failed.")
@@ -105,5 +106,8 @@ class LiveStreamJob:
 
     def get_frame(self):
         with self.lock:
+            if self.latest_frame is None:
+                print("[LIVE_STREAM_JOB] Keine Frames vorhanden.")
             return self.latest_frame.copy() if self.latest_frame is not None else None
+
 
