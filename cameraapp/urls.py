@@ -6,6 +6,7 @@ urlpatterns = [
     path("", views.stream_page, name="stream_page"),
     path("update_settings/", views.update_camera_settings, name="update_camera_settings"),
     path("photo/settings/", views.update_photo_settings, name="update_photo_settings"),
+    path("photo/auto-adjust/", views.auto_photo_adjust, name="auto_photo_adjust"),
     path("photo/manual/", views.take_photo_now, name="take_photo_now"), 
     path("video_feed/", views.video_feed, name="video_feed"),
     path("start_recording/", views.start_recording, name="start_recording"),
@@ -17,4 +18,5 @@ urlpatterns = [
     path("accounts/logout/", views.logout_view, name="logout"),
     path("reboot/", views.reboot_pi, name="reboot_pi"),
     path("media-browser/", views.media_browser, name="media_browser"),
+
 ]
