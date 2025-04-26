@@ -294,15 +294,15 @@ def settings_view(request):
         "title": "Settings"
     })
 
-
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
-    print(f"[RECORD_TO_FILE] Begin: {filepath}")
-    print(f"[RECORD_TO_FILE] Params → Duration: {duration}, FPS: {fps}, Resolution: {resolution}, Codec: {codec}")
+    print(f"[RECORD_TO_FILE] Begin recording: {filepath}")
+    print(f"[RECORD_TO_FILE] Settings → Duration: {duration}s, FPS: {fps}, Resolution: {resolution}, Codec: {codec}")
 
+    # Prepare the VideoWriter
     fourcc = cv2.VideoWriter_fourcc(*codec)
     out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
     if not out.isOpened():
-        print("[RECORD_TO_FILE] VideoWriter failed to open!")
+        print("[RECORD_TO_FILE] Error: Failed to open VideoWriter.")
         return False
 
     frame_count = 0
@@ -313,20 +313,27 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
             frame = latest_frame.copy() if latest_frame is not None else None
 
         if frame is None:
-            print(f"[RECORD_TO_FILE] Frame {frame_count}: NULL")
-            time.sleep(0.1)
+            print(f"[RECORD_TO_FILE] Warning: No frame captured at {frame_count}. Retrying...")
+            time.sleep(0.05)
             continue
 
-        resized = cv2.resize(frame, resolution)
-        out.write(resized)
-        frame_count += 1
+        try:
+            resized = cv2.resize(frame, resolution)
+            out.write(resized)
+            frame_count += 1
 
-        if frame_count % 10 == 0:
-            print(f"[RECORD_TO_FILE] Wrote {frame_count} frames...")
+            if frame_count % 10 == 0:
+                print(f"[RECORD_TO_FILE] Info: {frame_count} frames written so far...")
+        except Exception as e:
+            print(f"[RECORD_TO_FILE] Error writing frame {frame_count}: {e}")
+            break
 
     out.release()
-    print(f"[RECORD_TO_FILE] Finished. Total frames: {frame_count}")
+    duration_recorded = time.time() - start_time
+    print(f"[RECORD_TO_FILE] Recording complete. Total frames: {frame_count}, Time: {duration_recorded:.2f}s")
+
     return frame_count > 0
+
 
 
 @login_required
