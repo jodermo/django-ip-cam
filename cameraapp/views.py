@@ -30,8 +30,8 @@ from .camera_core import (
     apply_auto_settings, auto_adjust_from_frame, apply_cv_settings
 )
 from .recording_job import RecordingJob
-
-from .scheduler import take_photo, LiveStreamJob
+from .live_stream_job import LiveStreamJob
+from .scheduler import take_photo 
 from .globals import camera_lock, latest_frame, latest_frame_lock
 
 from dotenv import load_dotenv
@@ -54,17 +54,16 @@ recording_job = None
 recording_timeout = 30
 
 # Stream Job
-livestream_job = LiveStreamJob(
+globals()["livestream_job"] = LiveStreamJob(
     camera_url=CAMERA_URL,
     frame_callback=lambda f: update_latest_frame(f)
 )
+
 
 def update_latest_frame(frame):
     global latest_frame
     with latest_frame_lock:
         latest_frame = frame.copy()
-    # Optionales Debugging:
-    # print(f"[DEBUG] Frame updated at {time.time()}")
 
 
 def logout_view(request):
@@ -421,9 +420,9 @@ def media_browser(request):
 def update_camera_settings(request):
     global camera_instance
     global livestream_job 
-    
+
     try:
-        settings_obj = CameraSettings.objects.first()
+        settings_obj = get_camera_settings_safe()
         if settings_obj:
             print("[UPDATE_CAMERA_SETTINGS] Anfrage erhalten:", dict(request.POST))
 
@@ -452,11 +451,9 @@ def update_camera_settings(request):
         print(f"[UPDATE_CAMERA_SETTINGS] Fehler beim Speichern: {e}")
         return HttpResponseRedirect(reverse("stream_page"))
 
-
-
     with camera_lock:
         livestream_job.stop()
-        time.sleep(1.0)
+        livestream_job.join(timeout=2.0)
 
         if camera_instance and camera_instance.isOpened():
             camera_instance.release()
@@ -470,24 +467,22 @@ def update_camera_settings(request):
         else:
             print("[UPDATE_CAMERA_SETTINGS] Kamera konnte nicht erneut geöffnet werden.")
 
-        # 💡 Hier: neuen Thread erzeugen
         livestream_job = LiveStreamJob(
             camera_url=CAMERA_URL,
             frame_callback=lambda f: update_latest_frame(f)
         )
+        globals()["livestream_job"] = livestream_job
         livestream_job.start()
         print("[UPDATE_CAMERA_SETTINGS] Livestream neu gestartet.")
 
     return HttpResponseRedirect(reverse("stream_page"))
 
 
-
-
 @require_POST
 @login_required
 def update_photo_settings(request):
     try:
-        settings_obj = CameraSettings.objects.first()
+        settings_obj = get_camera_settings_safe()
         if not settings_obj:
             print("[UPDATE_PHOTO_SETTINGS] Kein CameraSettings-Objekt gefunden.")
             return HttpResponseRedirect(reverse("photo_settings_page"))

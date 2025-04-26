@@ -26,7 +26,63 @@ class LiveStreamJob:
                 self.capture.release()
                 self.capture = None
 
+    def restart(self):
+        self.stop()
+        time.sleep(1.0)
+        self.start()
+
+    def join(self, timeout=None):
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout)
+
     def _run(self):
+        retry_limit = 5
+        retry_delay = 2.0
+
+        def reconnect():
+            print("[LIVE_STREAM_JOB] Attempting to reconnect camera...")
+            cap = try_open_camera(self.camera_source, retries=retry_limit, delay=retry_delay)
+            if cap and cap.isOpened():
+                settings = get_camera_settings()
+                apply_cv_settings(cap, settings, mode="video")
+                print("[LIVE_STREAM_JOB] Reconnection successful.")
+                return cap
+            print("[LIVE_STREAM_JOB] Reconnection failed.")
+            return None
+
+        self.capture = reconnect()
+        if not self.capture:
+            self.running = False
+            return
+
+        print("[LIVE_STREAM_JOB] Camera streaming started.")
+
+        while self.running:
+            ret, frame = self.capture.read()
+            if not ret:
+                print("[LIVE_STREAM_JOB] Frame read failed, releasing and retrying...")
+                self.capture.release()
+                self.capture = reconnect()
+                if not self.capture:
+                    print("[LIVE_STREAM_JOB] Giving up after retries.")
+                    self.running = False
+                    break
+                continue
+
+            if self.frame_callback:
+                self.frame_callback(frame)
+
+            with self.lock:
+                self.latest_frame = frame.copy()
+
+            time.sleep(0.03)  # ~30 FPS
+
+        if self.capture:
+            self.capture.release()
+            self.capture = None
+
+        print("[LIVE_STREAM_JOB] Stopped.")
+
         from .camera_core import try_open_camera, apply_video_settings
 
         retry_limit = 5
