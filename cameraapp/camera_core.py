@@ -128,24 +128,23 @@ def apply_camera_settings(cap, brightness=None, contrast=None):
         if contrast is not None:
             cap.set(cv2.CAP_PROP_CONTRAST, contrast)
 
-def apply_video_settings(capture):
+def apply_video_settings(cap):
     from cameraapp.models import CameraSettings
     settings = CameraSettings.objects.first()
-    if not capture or not settings or not capture.isOpened():
+    if not cap or not settings or not cap.isOpened():
         return
 
     if settings.video_exposure_mode == "auto":
-        capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
-        print("[VIDEO] Auto-Exposure aktiviert")
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
     else:
-        capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
-        print("[VIDEO] Manuelle Belichtung aktiviert")
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+
 
     for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
         value = getattr(settings, f"video_{param}", -1)
         if value >= 0:
-            ok = capture.set(getattr(cv2, f"CAP_PROP_{param.upper()}"), value)
-            actual = capture.get(getattr(cv2, f"CAP_PROP_{param.upper()}"))
+            ok = cap.set(getattr(cv2, f"CAP_PROP_{param.upper()}"), value)
+            actual = cap.get(getattr(cv2, f"CAP_PROP_{param.upper()}"))
             print(f"[VIDEO] Set {param} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
 
 
