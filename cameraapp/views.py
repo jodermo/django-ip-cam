@@ -290,7 +290,7 @@ def start_recording(request):
     global recording_thread, recording_active
 
     def record_with_timeout():
-        nonlocal recording_active
+        global recording_active
         print("[RECORD] Recording started.")
         start_time = time.time()
         try:
@@ -299,6 +299,7 @@ def start_recording(request):
             with recording_lock:
                 recording_active = False
                 print("[RECORD] Recording stopped.")
+
     
     with recording_lock:
         if recording_active:
