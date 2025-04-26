@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Foto-Einstellungen</h1>
+  <form method="post" action="{% url 'update_photo_settings' %}">
+    {% csrf_token %}
+
+    <label>Brightness:
+      <input type="range" step="0.1" name="photo_brightness" value="{{ settings.photo_brightness }}">
+    </label><br>
+
+    <label>Contrast:
+      <input type="range" step="0.1" name="photo_contrast" value="{{ settings.photo_contrast }}">
+    </label><br>
+
+    <label>Saturation:
+      <input type="range" step="0.1" name="photo_saturation" value="{{ settings.photo_saturation }}">
+    </label><br>
+
+    <label>Exposure:
+      <input type="range" step="0.1" name="photo_exposure" value="{{ settings.photo_exposure }}">
+    </label><br>
+
+    <label>Gain:
+      <input type="range" step="0.1" name="photo_gain" value="{{ settings.photo_gain }}">
+    </label><br>
+
+    <label>Exposure Mode:
+      <select name="photo_exposure_mode">
+        <option value="manual" {% if settings.photo_exposure_mode == 'manual' %}selected{% endif %}>Manuell</option>
+        <option value="auto" {% if settings.photo_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
+      </select>
+    </label><br>
+
+    <button type="submit">Speichern</button>
+  </form>
+{% endblock %}
