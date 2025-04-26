@@ -131,6 +131,7 @@ def apply_camera_settings(cap, brightness=None, contrast=None):
 def apply_video_settings(cap):
     from cameraapp.models import CameraSettings
     settings = CameraSettings.objects.first()
+    return
     if not cap or not settings or not cap.isOpened():
         return
 
