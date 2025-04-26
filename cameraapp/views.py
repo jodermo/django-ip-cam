@@ -83,15 +83,25 @@ def get_frame(self):
 
 @login_required
 def video_feed(request):
-    def dummy_generator():
+    if not livestream_job.running:
+        livestream_job.start()
+
+    def stream_generator():
         while True:
-            img = cv2.imread("cameraapp/static/video_fallback.png")
-            _, buffer = cv2.imencode(".jpg", img)
+            frame = livestream_job.get_frame()
+            if frame is None:
+                time.sleep(0.1)
+                continue
+            ret, buffer = cv2.imencode(".jpg", frame)
+            if not ret:
+                continue
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" +
                    buffer.tobytes() + b"\r\n")
-            time.sleep(0.2)
-    return StreamingHttpResponse(dummy_generator(), content_type="multipart/x-mixed-replace; boundary=frame")
+
+    return StreamingHttpResponse(stream_generator(),
+        content_type="multipart/x-mixed-replace; boundary=frame")
+
 
 
 @login_required
