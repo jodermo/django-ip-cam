@@ -365,3 +365,4 @@ def take_photo_now(request):
             take_photo()
         finally:
             resume_livestream()
+    return JsonResponse({"status": "ok"})
