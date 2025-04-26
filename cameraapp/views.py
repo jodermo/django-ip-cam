@@ -86,17 +86,19 @@ def is_camera_open():
 def read_frame():
     with camera_lock:
         if not is_camera_open():
-            return None
+            print("[READ_FRAME] Camera not open, trying to reinitialize...")
+            init_camera()
+            if not is_camera_open():
+                return None
         ret, frame = camera_instance.read()
         return frame if ret else None
+
 
 def gen_frames():
     global active_stream_viewers, last_disconnect_time
     print("[GEN_FRAMES] Start streaming loop.")
 
     with camera_lock:
-        if not is_camera_open():
-            init_camera()
         active_stream_viewers += 1
         print(f"[STREAM] Viewer connected. Active: {active_stream_viewers}")
 
@@ -107,9 +109,9 @@ def gen_frames():
         while True:
             frame = read_frame()
             if frame is None:
-                print("[GEN_FRAMES] No frame, sleeping...")
-                time.sleep(1)
+                print("[GEN_FRAMES] No frame, trying to reinit camera...")
                 init_camera()
+                time.sleep(1)
                 continue
 
             if overlay:
@@ -118,11 +120,13 @@ def gen_frames():
 
             ret, buffer = cv2.imencode(".jpg", frame)
             if not ret:
-                print("[GEN_FRAMES] Frame encoding failed.")
+                print("[GEN_FRAMES] Encoding failed.")
                 continue
 
-            yield (b"--frame\r\n"
-                   b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
+            )
     finally:
         with camera_lock:
             active_stream_viewers -= 1
