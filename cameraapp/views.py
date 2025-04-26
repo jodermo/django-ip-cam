@@ -9,7 +9,9 @@ import subprocess
 from cameraapp.livestream_job import livestream_job, init_stream_job
 
 if livestream_job is None:
-    init_stream_job(0)
+    livestream_job = init_stream_job(CAMERA_URL, update_latest_frame)
+
+
 # Django
 from django.http import (
     StreamingHttpResponse, HttpResponseServerError, JsonResponse,
@@ -105,6 +107,9 @@ def reset_camera_settings(request):
 
 @login_required
 def video_feed(request):
+
+
+
     with camera_lock:
         if not livestream_job.running:
             livestream_job.start()
@@ -152,33 +157,30 @@ def apply_video_settings(cap):
 
 @login_required
 def stream_page(request):
+    global livestream_job
+
     settings_obj = get_camera_settings_safe()
     camera_error = None
 
     if request.method == "POST":
-        for field in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-            val = request.POST.get(f"video_{field}")
-            if val is not None:
-                try:
-                    setattr(settings_obj, f"video_{field}", float(val))
-                except ValueError:
-                    pass
-        settings_obj.save()
-
-        # Sicher stoppen (Livestream und Kamera freigeben)
+        # ... settings speichern ...
         with camera_lock:
-            livestream_job.stop()
+            if livestream_job:
+                livestream_job.stop()
             time.sleep(1.0)
 
             if camera_instance and camera_instance.isOpened():
                 camera_instance.release()
 
             init_camera()
-            livestream_job.start()
+            if livestream_job:
+                livestream_job.start()
+
+    if livestream_job is None:
+        livestream_job = init_stream_job(CAMERA_URL, update_latest_frame)
 
     if not livestream_job.running:
         livestream_job.start()
-
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
@@ -467,7 +469,7 @@ def update_camera_settings(request):
             print("[UPDATE_CAMERA_SETTINGS] Kamera konnte nicht erneut geöffnet werden.")
 
         livestream_job = LiveStreamJob(
-            camera_url=CAMERA_URL,
+            camera_source=CAMERA_URL,
             frame_callback=lambda f: update_latest_frame(f)
         )
         globals()["livestream_job"] = livestream_job
