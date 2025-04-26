@@ -53,6 +53,9 @@ def update_latest_frame(frame):
     global latest_frame
     with latest_frame_lock:
         latest_frame = frame.copy()
+    # Optionales Debugging:
+    # print(f"[DEBUG] Frame updated at {time.time()}")
+
 
 def logout_view(request):
     logout(request)
@@ -90,20 +93,33 @@ def video_feed(request):
         livestream_job.start()
 
     def stream_generator():
+        frame_fail_count = 0
         while True:
             frame = livestream_job.get_frame()
             if frame is None:
                 time.sleep(0.1)
+                frame_fail_count += 1
+                if frame_fail_count > 100:  # ca. 10 Sekunden keine Frames
+                    print("[VIDEO_FEED] No frames received for 10 seconds. Aborting stream.")
+                    break
                 continue
+
+            frame_fail_count = 0
             ret, buffer = cv2.imencode(".jpg", frame)
             if not ret:
                 continue
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" +
                    buffer.tobytes() + b"\r\n")
+            time.sleep(0.03)  # Limit auf ~30fps
 
-    return StreamingHttpResponse(stream_generator(),
-        content_type="multipart/x-mixed-replace; boundary=frame")
+    try:
+        return StreamingHttpResponse(stream_generator(),
+            content_type="multipart/x-mixed-replace; boundary=frame")
+    except Exception as e:
+        print(f"[VIDEO_FEED] Streaming error: {e}")
+        return HttpResponseServerError("Streaming error")
+
 
 
 
