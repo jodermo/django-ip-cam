@@ -20,3 +20,8 @@
 .navbar a:hover {
     background-color: #444;
 }
+
+
+#thumbnailBar img.selected {
+    border: 2px solid red;
+}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-    <h2 style="text-align:center;">Saved Photos</h2>
+    <h2 style="text-align:center;">Timelaps Gallery</h2>
     <canvas id="photoCanvas" width="640" height="480"></canvas>
 
     <div class="controls">
@@ -23,7 +23,12 @@
         <label>Timeline: <span id="currentIndex">0</span> / <span id="totalCount">0</span></label><br>
         <input type="range" id="timeSlider" min="0" value="0" onchange="sliderJump()">
     </div>
-
+    <div id="thumbnailBar" style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; max-height: 120px; overflow-y: auto;">
+        {% for photo in photos %}
+            <img src="{{ photo }}" width="80" style="cursor: pointer;" onclick="jumpToIndex({{ forloop.counter0 }})">
+        {% endfor %}
+    </div>
+    
     <script>
         const photos = {{ photos|safe }};
         let index = 0;
@@ -48,6 +53,10 @@
 
         totalCountLabel.textContent = photos.length - 1;
         timeSlider.max = photos.length - 1;
+
+        function jumpToIndex(i) {
+            showImage(i);
+        }
 
         function loadImage(src) {
             const img = new Image();
@@ -82,6 +91,9 @@
                 timeSlider.value = index;
                 currentIndexLabel.textContent = index;
             }
+            document.querySelectorAll("#thumbnailBar img").forEach((img, i) => {
+                img.classList.toggle("selected", i === index);
+            });
         }
 
         function nextImage() {
