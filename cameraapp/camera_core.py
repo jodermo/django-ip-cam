@@ -2,8 +2,10 @@
 
 import os
 import cv2
+import time
 from django.apps import apps
 from dotenv import load_dotenv
+from cameraapp.models import CameraSettings
 
 load_dotenv()
 
@@ -11,6 +13,22 @@ CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
 CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
 camera_instance = None
+
+
+def try_open_camera(source, retries=3, delay=1.5):
+    cap = None
+    for i in range(retries):
+        print(f"[CAMERA] Trying to open camera (attempt {i + 1})...")
+        cap = cv2.VideoCapture(source)
+        time.sleep(0.5)  # Give driver a moment
+        if cap.isOpened():
+            print("[CAMERA] Successfully opened.")
+            return cap
+        cap.release()
+        time.sleep(delay)
+    print("[CAMERA] Failed to open camera after retries.")
+    return None
+
 
 def init_camera():
     """Initialisiert die globale Kamera-Instanz mit gespeicherten Video-Settings."""
@@ -22,7 +40,11 @@ def init_camera():
         camera_instance.release()
 
     print(f"[CAMERA_CORE] Attempting to open camera from source: {CAMERA_URL}")
-    camera_instance = cv2.VideoCapture(CAMERA_URL)
+    camera_instance = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
+    if not camera_instance:
+        print("[CAMERA_CORE] Failed to open camera after retries.")
+        return
+
 
     if not camera_instance or not camera_instance.isOpened():
         print("[CAMERA_CORE] Failed to open camera.")
@@ -76,6 +98,16 @@ def apply_camera_settings(cap, brightness=None, contrast=None):
         if contrast is not None:
             cap.set(cv2.CAP_PROP_CONTRAST, contrast)
 
+def apply_video_settings(capture):
+    settings = CameraSettings.objects.first()
+    if settings:
+        for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+            value = getattr(settings, f"video_{param}", -1)
+            if value >= 0:
+                ok = capture.set(getattr(cv2, f"CAP_PROP_{param.upper()}"), value)
+                actual = capture.get(getattr(cv2, f"CAP_PROP_{param.upper()}"))
+                print(f"[VIDEO] Set {param} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
+
 
 def apply_auto_settings(settings):
     """
@@ -121,3 +153,5 @@ def auto_adjust_from_frame(frame, settings):
 
     settings.save()
     print("[CAMERA_CORE] Auto-adjusted settings saved based on frame analysis.")
+
+

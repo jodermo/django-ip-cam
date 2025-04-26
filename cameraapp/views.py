@@ -350,10 +350,20 @@ def pause_livestream():
 
 def resume_livestream():
     print("[PHOTO] Warte auf Freigabe der Kamera...")
-    time.sleep(1.5)  # Verzögerung für sichere Freigabe
+    time.sleep(1.5)
+
     if not livestream_job.running:
-        livestream_job.start()
-        print("[PHOTO] Livestream wurde wieder gestartet.")
+        for attempt in range(3):
+            livestream_job.start()
+            time.sleep(1.0)
+            if livestream_job.running and livestream_job.get_frame() is not None:
+                print("[PHOTO] Livestream wurde wieder gestartet.")
+                return
+            print(f"[PHOTO] Livestream-Neustart fehlgeschlagen (Versuch {attempt + 1})")
+            livestream_job.stop()
+            time.sleep(1.5)
+
+        print("[PHOTO] Livestream konnte nicht gestartet werden.")
 
 
 

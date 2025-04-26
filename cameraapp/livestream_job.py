@@ -1,43 +1,23 @@
 import threading
 import time
-import cv2
-from cameraapp.models import CameraSettings
-
-def apply_video_settings(capture):
-    settings = CameraSettings.objects.first()
-    if settings:
-        for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-            value = getattr(settings, f"video_{param}", -1)
-            if value >= 0:
-                capture.set(getattr(cv2, f"CAP_PROP_{param.upper()}"), value)
-                print(f"[VIDEO] Set {param} = {value}")
 
 
 class LiveStreamJob:
     def __init__(self, camera_source, frame_callback=None):
         self.camera_source = camera_source
-        self.frame_callback = frame_callback  # optional hook
+        self.frame_callback = frame_callback
         self.lock = threading.Lock()
         self.running = False
         self.latest_frame = None
         self.thread = None
         self.capture = None
 
-
     def start(self):
         if self.running:
             return
-        self.capture = cv2.VideoCapture(self.camera_source)
-        if not self.capture.isOpened():
-            print("[LIVE_STREAM_JOB] Error: Unable to open camera.")
-            self.capture.release()
-            self.capture = None
-            self.running = False
-            return  # <--- notwendig
         self.running = True
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
-
 
     def stop(self):
         with self.lock:
@@ -47,14 +27,63 @@ class LiveStreamJob:
                 self.capture = None
 
     def _run(self):
-        self.capture = cv2.VideoCapture(self.camera_source)
-        apply_video_settings(self.capture)
-        if not self.capture.isOpened():
-            print("[LIVE_STREAM_JOB] Error: Unable to open camera.")
+        from .camera_core import try_open_camera, apply_video_settings
+
+        retry_limit = 5
+        retry_delay = 2.0
+
+        def reconnect():
+            print("[LIVE_STREAM_JOB] Attempting to reconnect camera...")
+            cap = try_open_camera(self.camera_source, retries=retry_limit, delay=retry_delay)
+            if cap and cap.isOpened():
+                apply_video_settings(cap)
+                print("[LIVE_STREAM_JOB] Reconnection successful.")
+                return cap
+            print("[LIVE_STREAM_JOB] Reconnection failed.")
+            return None
+
+        self.capture = reconnect()
+        if not self.capture:
             self.running = False
             return
 
         print("[LIVE_STREAM_JOB] Camera streaming started.")
+
+        while self.running:
+            ret, frame = self.capture.read()
+            if not ret:
+                print("[LIVE_STREAM_JOB] Frame read failed, releasing and retrying...")
+                self.capture.release()
+                self.capture = reconnect()
+                if not self.capture:
+                    print("[LIVE_STREAM_JOB] Giving up after retries.")
+                    self.running = False
+                    break
+                continue
+
+            if self.frame_callback:
+                self.frame_callback(frame)
+
+            with self.lock:
+                self.latest_frame = frame.copy()
+
+            time.sleep(0.03)  # ~30 FPS
+
+        if self.capture:
+            self.capture.release()
+            self.capture = None
+
+        print("[LIVE_STREAM_JOB] Stopped.")
+
+        self.capture = try_open_camera(self.camera_source, retries=5, delay=2.0)
+        if not self.capture or not self.capture.isOpened():
+            print("[LIVE_STREAM_JOB] Error: Unable to open camera.")
+            self.running = False
+            return
+        from .camera_core import apply_video_settings
+        apply_video_settings(self.capture)
+        print("[LIVE_STREAM_JOB] Camera streaming started.")
+
         while self.running:
             ret, frame = self.capture.read()
             if not ret:
