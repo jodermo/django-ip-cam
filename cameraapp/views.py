@@ -431,7 +431,9 @@ def media_browser(request):
 def update_camera_settings(request):
     global camera_instance
     global livestream_job 
-
+    if not camera_instance or not camera_instance.isOpened():
+        print("[UPDATE_CAMERA_SETTINGS] Fallback: Camera still not open. Forcing restart...")
+        force_restart_livestream()
     try:
         settings_obj = get_camera_settings_safe(connection)
         if settings_obj:

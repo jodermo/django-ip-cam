@@ -56,8 +56,6 @@ services:
       - .env
     volumes:
       - .:/app
-    devices:
-      - /dev/video0:/dev/video0
     privileged: true
     restart: unless-stopped
 
