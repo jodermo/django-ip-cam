@@ -213,6 +213,7 @@ document.getElementById("manual-restart-form").addEventListener("submit", functi
       headers: { "X-CSRFToken": "{{ csrf_token }}" }
     }).then(() => updateRecordingStatus());
   }
+
   function updateStreamImage() {
     const img = document.getElementById("streamImage");
     img.src = "{% url 'video_feed' %}?t=" + new Date().getTime();
