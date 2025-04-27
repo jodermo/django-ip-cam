@@ -105,7 +105,12 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
     Returns the new LiveStreamJob, or None on failure.
     """
     global livestream_job, camera
-
+    if not camera.cap:
+        logger.error("CameraManager.cap is None after initialization")
+    elif not camera.cap.isOpened():
+        logger.error("CameraManager.cap is not opened")
+    else:
+        logger.info("CameraManager.cap is valid and opened")
     with camera_lock:
         # 1) Stop existing livestream
         if livestream_job and livestream_job.running:
@@ -151,7 +156,7 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
             new_job = LiveStreamJob(
                 camera_source=None,        # unused when shared_capture is given
                 frame_callback=frame_callback,
-                shared_capture=camera.cap
+                shared_capture=(camera.cap if camera else None)
             )
             new_job.start()
 
