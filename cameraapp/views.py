@@ -121,18 +121,26 @@ def generate_frames():
 
 
 
-@login_required
+@csrf_exempt
 def video_feed(request):
     global app_globals
-    with app_globals.latest_frame_lock:
-        if app_globals.latest_frame is None:
-            print("[VIDEO_FEED] No frame available (latest_frame is None). Returning 503.")
-            return HttpResponse("No frame", status=503)
     print("[VIDEO_FEED] Frame available. Starting streaming response.")
+
+    def frame_generator():
+        while True:
+            frame = get_latest_frame()
+            if frame is not None:
+                ret, jpeg = cv2.imencode('.jpg', frame)
+                if ret:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+            time.sleep(0.04)  # 25 FPS max
+
     return StreamingHttpResponse(
-        generate_frames(),
-        content_type="multipart/x-mixed-replace; boundary=frame"
+        frame_generator(),
+        content_type='multipart/x-mixed-replace; boundary=frame'
     )
+
 
 @login_required
 def stream_page(request):
@@ -154,7 +162,6 @@ def stream_page(request):
     # ========== [2] KAMERA NEU INITIALISIEREN ==========
     try:
         release_and_reset_camera()
-        init_camera()
         print("[STREAM_PAGE] Camera initialized successfully.")
     except Exception as e:
         print(f"[STREAM_PAGE] Failed to initialize camera: {e}")
