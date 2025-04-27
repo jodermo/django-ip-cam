@@ -15,25 +15,23 @@ load_dotenv()
 
 
 
-
-
 def find_working_camera_device():
     candidates = sorted(glob.glob("/dev/video*"))
     print(f"[CAMERA_CORE] Scanning for available video devices: {candidates}")
     for device in candidates:
-        for backend in [cv2.CAP_V4L2, cv2.CAP_ANY]:
-            try:
-                cap = cv2.VideoCapture(device, backend)
-                if cap.isOpened():
-                    ret, _ = cap.read()
-                    cap.release()
-                    if ret:
-                        print(f"[CAMERA_CORE] Found working camera: {device} using backend {backend}")
-                        return device
-            except Exception as e:
-                print(f"[CAMERA_CORE] Error testing {device} with backend {backend}: {e}")
+        try:
+            cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
+            if cap.isOpened():
+                ret, _ = cap.read()
+                cap.release()
+                if ret:
+                    print(f"[CAMERA_CORE] Found working camera: {device}")
+                    return device
+        except Exception as e:
+            print(f"[CAMERA_CORE] Error testing {device}: {e}")
     print("[CAMERA_CORE] No working camera found.")
     return None
+
 
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
@@ -49,23 +47,28 @@ else:
 
 def init_camera():
     global camera
-    if camera:
-        try:
-            camera.stop()
-            time.sleep(1.0)
-        except Exception as e:
-            print(f"[CAMERA_CORE] Failed to stop previous camera: {e}")
 
-    print("[CAMERA_CORE] Initializing new CameraManager...")
-    camera_instance = CameraManager(source=CAMERA_URL)
-    if not camera_instance or not camera_instance.cap or not camera_instance.cap.isOpened():
-        print("[CAMERA_CORE] Camera could not be initialized.")
-        camera = None
+    if camera and camera.is_available():
+        print("[CAMERA_CORE] Camera already initialized")
         return
 
-    camera_instance.start()
-    camera = camera_instance  # setzt die globale Instanz
-    print("[CAMERA_CORE] CameraManager started.")
+    print("[CAMERA_CORE] Initializing new CameraManager...")
+
+    try:
+        source = CAMERA_URL
+        if source == "0" and not os.path.exists("/dev/video0"):
+            fallback = find_working_camera_device()
+            source = fallback if fallback else 0
+
+        new_camera = CameraManager(source=source)
+
+        if new_camera.is_available():
+            camera = new_camera
+            print("[CAMERA_CORE] CameraManager initialized and running.")
+        else:
+            print("[CAMERA_CORE] Camera could not be initialized.")
+    except Exception as e:
+        print(f"[CAMERA_CORE] Exception during camera init: {e}")
 
 
 def reset_to_default():
