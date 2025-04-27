@@ -252,14 +252,15 @@ def reset_camera_view(request):
     init_camera()
     return redirect("settings_page")  # oder wo du zurück willst
 
+
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
-    print(f"[RECORD_TO_FILE] Starting recording to {filepath} (duration={duration}s, fps={fps}, resolution={resolution})")
+    print(f"[RECORD_TO_FILE] Start recording to {filepath} (duration={duration}s, fps={fps}, resolution={resolution})")
 
     try:
         fourcc = cv2.VideoWriter_fourcc(*codec)
         out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
         if not out.isOpened():
-            print(f"[RECORD_TO_FILE] Error: Cannot open file {filepath} for writing.")
+            print(f"[RECORD_TO_FILE] Error: Cannot open file {filepath}")
             return False
 
         frame_count = 0
@@ -270,21 +271,14 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
                 frame = latest_frame.copy() if latest_frame is not None else None
 
             if frame is None:
-                print("[RECORD_TO_FILE] No frame available, retrying...")
                 time.sleep(0.05)
                 continue
 
-            try:
-                resized_frame = cv2.resize(frame.copy(), resolution)
-                out.write(resized_frame)
-                frame_count += 1
-                if frame_count % 10 == 0:
-                    print(f"[RECORD_TO_FILE] {frame_count} frames written...")
-            except Exception as frame_err:
-                print(f"[RECORD_TO_FILE] Frame write failed: {frame_err}")
-                break
+            resized_frame = cv2.resize(frame, resolution)
+            out.write(resized_frame)
+            frame_count += 1
 
-            time.sleep(1.0 / fps)
+            time.sleep(1.0 / fps)  # respect target fps
 
     except Exception as e:
         print(f"[RECORD_TO_FILE] Exception during recording: {e}")
@@ -292,9 +286,10 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
 
     finally:
         out.release()
-        print(f"[RECORD_TO_FILE] Recording complete: {frame_count} frames saved → {filepath}")
+        print(f"[RECORD_TO_FILE] Recording finished: {frame_count} frames saved → {filepath}")
 
     return frame_count > 0
+
 
 
 

@@ -10,8 +10,8 @@ class LiveStreamJob:
         self.running = False
         self.latest_frame = None
         self.thread = None
-        self.capture = None
-        self.shared_capture = shared_capture 
+        self.capture = shared_capture or None
+        self.shared_capture = shared_capture
 
     def start(self):
         if self.running:
@@ -23,7 +23,7 @@ class LiveStreamJob:
     def stop(self):
         with self.lock:
             self.running = False
-            if self.capture:
+            if self.capture and not self.shared_capture:
                 self.capture.release()
                 self.capture = None
 
@@ -37,50 +37,31 @@ class LiveStreamJob:
             self.thread.join(timeout)
 
     def _run(self):
-        retry_limit = 5
-        retry_delay = 2.0
-
         def reconnect():
-            print("[LIVE_STREAM_JOB] Attempting to reconnect camera...")
             if self.shared_capture:
-                print("[DEBUG] Using shared camera instance.")
+                print("[LIVE_STREAM_JOB] Shared capture provided — skipping reconnect.")
                 return self.shared_capture
-            cap = try_open_camera(self.camera_source, retries=retry_limit, delay=retry_delay)
+            print("[LIVE_STREAM_JOB] Attempting to open camera...")
+            cap = try_open_camera(self.camera_source, retries=5, delay=2.0)
             if cap and cap.isOpened():
                 settings = get_camera_settings()
                 apply_cv_settings(cap, settings, mode="video")
-
-                # Test read immediately after applying settings
-                ret, test_frame = cap.read()
-                if not ret or test_frame is None:
-                    print("[LIVE_STREAM_JOB] WARNING: Camera opened but failed to read a frame immediately.")
-                    cap.release()
-                    return None
-
-                print("[LIVE_STREAM_JOB] Reconnection successful.")
+                print("[LIVE_STREAM_JOB] Camera opened successfully.")
                 return cap
-
-            print("[LIVE_STREAM_JOB] Reconnection failed.")
+            print("[LIVE_STREAM_JOB] Failed to open camera.")
             return None
 
-
         self.capture = reconnect()
-        if not self.capture:
+        if not self.capture or not self.capture.isOpened():
             self.running = False
             return
 
-        print("[LIVE_STREAM_JOB] Camera streaming started.")
-
+        print("[LIVE_STREAM_JOB] Streaming started.")
         while self.running:
             ret, frame = self.capture.read()
-            if not ret:
-                print("[LIVE_STREAM_JOB] Frame read failed. Capture open:", self.capture.isOpened())
-                self.capture.release()
-                self.capture = reconnect()
-                if not self.capture:
-                    print("[LIVE_STREAM_JOB] Giving up after retries.")
-                    self.running = False
-                    break
+            if not ret or frame is None:
+                print("[LIVE_STREAM_JOB] Frame read failed.")
+                time.sleep(0.2)
                 continue
 
             if self.frame_callback:
@@ -91,16 +72,12 @@ class LiveStreamJob:
 
             time.sleep(0.03)
 
-        if self.capture:
+        if self.capture and not self.shared_capture:
             self.capture.release()
             self.capture = None
 
         print("[LIVE_STREAM_JOB] Stopped.")
 
-
     def get_frame(self):
         with self.lock:
-            if self.latest_frame is None:
-                print("[LIVE_STREAM_JOB] Keine Frames vorhanden.")
             return self.latest_frame.copy() if self.latest_frame is not None else None
-
