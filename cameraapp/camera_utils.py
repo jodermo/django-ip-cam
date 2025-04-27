@@ -103,7 +103,7 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
     Restart the livestream job using the *single* CameraManager instance.
     Returns the new LiveStreamJob, or None on failure.
     """
-    global livestream_job
+    global livestream_job, camera
 
     with camera_lock:
         # 1) Stop existing livestream

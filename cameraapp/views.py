@@ -57,10 +57,9 @@ os.makedirs(PHOTO_DIR, exist_ok=True)
 
 
 
-def update_latest_frame(frame):
-    global latest_frame
+def update_latest_frame(f):
     with latest_frame_lock:
-        latest_frame = frame.copy()
+        globals()["latest_frame"] = f.copy()
 
 
 def logout_view(request):

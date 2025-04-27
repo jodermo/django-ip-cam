@@ -7,7 +7,7 @@ import threading
 import glob
 from cameraapp.models import CameraSettings
 from .camera_utils import safe_restart_camera_stream, get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe, update_livestream_job
-from .globals import camera_lock, camera
+from .globals import camera_lock, camera, latest_frame_lock, latest_frame
 from .camera_manager import CameraManager
 
 from dotenv import load_dotenv
@@ -44,7 +44,7 @@ else:
     CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
 def init_camera():
-    global camera, livestream_job
+    global camera, livestream_job, update_latest_frame, latest_frame
 
     if camera and camera.is_available():
         print("[CAMERA_CORE] Camera already initialized")
@@ -68,7 +68,7 @@ def init_camera():
             if not livestream_job or not livestream_job.running:
                 job = safe_restart_camera_stream(
                     camera_source=source,
-                    frame_callback=lambda f: setattr(globals(), 'latest_frame', f.copy())
+                    frame_callback=lambda f: update_latest_frame(f)
                 )
                 if job:
                     livestream_job = job
