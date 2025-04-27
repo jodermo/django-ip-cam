@@ -3,6 +3,7 @@
 import logging
 import time
 import threading
+import subprocess
 import cv2
 import fcntl
 import os
@@ -302,9 +303,22 @@ def try_open_camera_safe(source, retries=3, delay=1.0):
 
 def force_device_reset(device="/dev/video0"):
     try:
-        fd = os.open(device, os.O_RDWR)
-        fcntl.ioctl(fd, 0x5601)  # VIDIOC_STREAMOFF
-        os.close(fd)
-        print("[RESET] ioctl STREAMOFF sent.")
+        # Suche den zugehörigen USB-Port (z. B. 1-2.4) heraus
+        video_dev = os.path.realpath(device)
+        usb_path = os.readlink(f"/sys/class/video4linux/{os.path.basename(video_dev)}/device")
+        usb_bus = os.path.join("/sys/class/video4linux", os.path.basename(video_dev), "device", "authorized")
+
+        print(f"[RESET] Resetting USB device: {usb_bus}")
+
+        print("[CHECK] /dev/video0 exists:", os.path.exists("/dev/video0"))
+        print("[CHECK] Accessible:", os.access("/dev/video0", os.R_OK | os.W_OK))
+        print("[CHECK] lsof -t /dev/video0:", subprocess.getoutput("lsof -t /dev/video0"))
+
+        with open(usb_bus, "w") as f:
+            f.write("0")
+        time.sleep(1.0)
+        with open(usb_bus, "w") as f:
+            f.write("1")
+        print("[RESET] USB device re-enabled.")
     except Exception as e:
-        print(f"[RESET] ioctl STREAMOFF failed: {e}")
+        print(f"[RESET] USB reset failed: {e}")
