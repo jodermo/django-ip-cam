@@ -11,14 +11,14 @@ class CameraAppConfig(AppConfig):
     def ready(self):
         run_timelapse = os.environ.get("RUN_TIMELAPSE", "1") == "1"
         print(f"[CAMERA_APP] App ready. RUN_TIMELAPSE = {run_timelapse}")
-
+        threading.Thread(target=start_photo_scheduler, daemon=True).start()
         if run_timelapse:
             try:
                 from .scheduler import start_photo_scheduler
                 from .camera_utils import start_camera_watchdog
 
                 print("[CAMERA_APP] Starting timelapse scheduler thread...")
-                threading.Thread(target=start_photo_scheduler, daemon=True).start()
+                # threading.Thread(target=start_photo_scheduler, daemon=True).start()
 
                 print("[CAMERA_APP] Starting camera watchdog...")
                 start_camera_watchdog()

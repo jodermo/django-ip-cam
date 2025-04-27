@@ -11,7 +11,6 @@ import logging
 from .camera_core import init_camera 
 from .camera_utils import apply_cv_settings, get_camera_settings, force_restart_livestream
 from .globals import app_globals
-
 logger = logging.getLogger(__name__)
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
@@ -134,3 +133,8 @@ def start_photo_scheduler():
             interval_min = 5
 
         time.sleep(interval_min * 60)
+
+
+
+
+
