@@ -8,7 +8,7 @@ import subprocess
 import cv2
 
 from django.apps import apps
-from .globals import livestream_job, camera_lock, latest_frame, latest_frame_lock
+from .globals import livestream_job, camera_lock, latest_frame, latest_frame_lock, camera
 from cameraapp.camera_manager import CameraManager
 from cameraapp.livestream_job import LiveStreamJob
 
