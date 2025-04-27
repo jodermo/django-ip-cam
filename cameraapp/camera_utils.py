@@ -196,8 +196,7 @@ def update_livestream_job(new_job):
     globals()["livestream_job"] = new_job
 
 
-
 def update_latest_frame(f):
+    from . import globals
     with latest_frame_lock:
-        globals()["latest_frame"] = f.copy()
-
+        globals.latest_frame = f.copy()
