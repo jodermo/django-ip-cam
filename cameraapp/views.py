@@ -6,10 +6,6 @@ import threading
 import datetime
 import subprocess
 # views.py
-from cameraapp.livestream_job import livestream_job, init_stream_job
-
-if livestream_job is None:
-    livestream_job = init_stream_job(CAMERA_URL, update_latest_frame)
 
 
 # Django
@@ -60,12 +56,20 @@ last_disconnect_time = None
 recording_job = None
 recording_timeout = 30
 
+def get_livestream_job(camera_source, frame_callback=None):
+    global livestream_job
+    if livestream_job is None:
+        from cameraapp.livestream_job import LiveStreamJob
+        livestream_job = LiveStreamJob(camera_source, frame_callback)
+    return livestream_job
+
 
 def update_latest_frame(frame):
     global latest_frame
     with latest_frame_lock:
         latest_frame = frame.copy()
 
+livestream_job = get_livestream_job(CAMERA_URL, update_latest_frame)
 
 def logout_view(request):
     logout(request)
@@ -176,9 +180,8 @@ def stream_page(request):
             if livestream_job:
                 livestream_job.start()
 
-    if livestream_job is None:
-        livestream_job = init_stream_job(CAMERA_URL, update_latest_frame)
-
+    livestream_job = get_livestream_job(CAMERA_URL, update_latest_frame)
+    
     if not livestream_job.running:
         livestream_job.start()
 
@@ -468,7 +471,7 @@ def update_camera_settings(request):
         else:
             print("[UPDATE_CAMERA_SETTINGS] Kamera konnte nicht erneut geöffnet werden.")
 
-        livestream_job = LiveStreamJob(
+        livestream_job = get_livestream_job(
             camera_source=CAMERA_URL,
             frame_callback=lambda f: update_latest_frame(f)
         )
