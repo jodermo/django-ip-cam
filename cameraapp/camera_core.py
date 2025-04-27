@@ -8,6 +8,7 @@ import glob
 from cameraapp.models import CameraSettings
 from .camera_utils import safe_restart_camera_stream, get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe, update_livestream_job
 from .globals import camera_lock, camera, latest_frame_lock, latest_frame
+from cameraapp.views import update_latest_frame
 from .camera_manager import CameraManager
 
 from dotenv import load_dotenv
@@ -61,6 +62,9 @@ def init_camera():
         new_camera = CameraManager(source=source)
 
         if new_camera.is_available():
+            if not new_camera.cap or not new_camera.cap.isOpened():
+                print("[CAMERA_CORE] Cap not ready after init.")
+                return
             camera = new_camera
             print("[CAMERA_CORE] CameraManager initialized and running.")
 

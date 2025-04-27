@@ -131,17 +131,16 @@ def generate_frames():
 
 @login_required
 def video_feed(request):
-    global camera
-    frame = camera.get_frame() if camera else None
-    if frame is None:
-        print("[VIDEO_FEED] No frame available. Returning 503.")
-        return HttpResponse("No frame", status=503)
-
+    with latest_frame_lock:
+        if latest_frame is None:
+            print("[VIDEO_FEED] No frame available (latest_frame is None). Returning 503.")
+            return HttpResponse("No frame", status=503)
     print("[VIDEO_FEED] Frame available. Starting streaming response.")
     return StreamingHttpResponse(
         generate_frames(),
         content_type="multipart/x-mixed-replace; boundary=frame"
     )
+
 
 
 @login_required
@@ -173,6 +172,16 @@ def stream_page(request):
         with livestream_resume_lock:
             if not livestream_job.running:
                 livestream_job.start()
+                
+    start_time = time.time()
+    while time.time() - start_time < 5:  # max 5 Sek. warten
+        with latest_frame_lock:
+            if latest_frame is not None:
+                print("[STREAM_PAGE] First frame received.")
+                break
+        time.sleep(0.2)
+    else:
+        print("[STREAM_PAGE] Timeout waiting for first frame.")
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
