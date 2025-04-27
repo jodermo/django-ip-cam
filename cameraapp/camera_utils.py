@@ -3,8 +3,11 @@ import logging
 import time
 import threading
 import cv2
+import fcntl
+import os
+import gc
 from django.apps import apps
-from .globals import camera_lock, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
+from .globals import camera_lock, camera_instance, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
 
 
 logger = logging.getLogger(__name__)
@@ -135,6 +138,19 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
 
     logger.info("[RESTART] Starting safe_restart_camera_stream...")
     with camera_lock:
+        if camera_instance and camera_instance.isOpened():
+            camera_instance.release()
+            print("[RELEASE] Camera released.")
+
+            try:
+                force_device_reset("/dev/video0")
+            except Exception as e:
+                print(f"[RELEASE] Device reset failed: {e}")
+
+            import gc
+            gc.collect()
+            time.sleep(2.5)
+            
         # 1) Stop existing livestream
         if livestream_job_ref and getattr(livestream_job_ref, 'running', False):
             logger.info("[RESTART] Stopping existing livestream job...")
@@ -264,3 +280,13 @@ def try_open_camera_safe(source, retries=3, delay=1.0):
         print(f"[SAFE_CAMERA] Retry {attempt+1} failed. Waiting {delay}s.")
         time.sleep(delay)
     return None
+
+
+def force_device_reset(device="/dev/video0"):
+    try:
+        fd = os.open(device, os.O_RDWR)
+        fcntl.ioctl(fd, 0x5601)  # VIDIOC_STREAMOFF
+        os.close(fd)
+        print("[RESET] ioctl STREAMOFF sent.")
+    except Exception as e:
+        print(f"[RESET] ioctl STREAMOFF failed: {e}")

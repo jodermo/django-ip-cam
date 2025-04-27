@@ -75,8 +75,8 @@
 </style>
 
 <div id="streamContainer">
-  <img id="streamImage" src="{% url 'video_feed' %}?t={{ now|date:'U' }}" alt="Live Stream">
-
+  <img id="streamImage" alt="Live Stream">
+  
   <div class="overlay-controls">
     <p><strong>User:</strong> {{ request.user.username }}</p>
     <p><strong>Viewers:</strong> {{ viewer_count }}</p>
@@ -178,5 +178,8 @@
 
   setInterval(updateRecordingStatus, 3000);
   updateRecordingStatus();
+
+  document.getElementById("streamImage").src = "{% url 'video_feed' %}?t=" + Date.now();
+
 </script>
 {% endblock %}
