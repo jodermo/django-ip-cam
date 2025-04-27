@@ -43,7 +43,6 @@ if CAMERA_URL_RAW == "0" and not os.path.exists("/dev/video0"):
 else:
     CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
-
 def init_camera():
     global camera, livestream_job
 
@@ -65,15 +64,16 @@ def init_camera():
             camera = new_camera
             print("[CAMERA_CORE] CameraManager initialized and running.")
 
-            # Start LiveStreamJob
-            job = safe_restart_camera_stream(
-                camera_source=source,
-                frame_callback=lambda f: setattr(globals(), 'latest_frame', f.copy())
-            )
-            job.start()
-            livestream_job = job
-            update_livestream_job(job)
-
+            # Starte Livestream nur wenn nicht aktiv
+            if not livestream_job or not livestream_job.running:
+                job = safe_restart_camera_stream(
+                    frame_callback=lambda f: setattr(globals(), 'latest_frame', f.copy())
+                )
+                if job:
+                    livestream_job = job
+                    update_livestream_job(livestream_job)
+                else:
+                    print("[CAMERA_CORE] Failed to start livestream job.")
         else:
             print("[CAMERA_CORE] Camera could not be initialized.")
 
