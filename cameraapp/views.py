@@ -64,6 +64,7 @@ def get_livestream_job(camera_source, frame_callback=None):
     global livestream_job
     from cameraapp.livestream_job import LiveStreamJob
     livestream_job = LiveStreamJob(camera_source, frame_callback)
+    return livestream_job
 
 
 def update_latest_frame(frame):
@@ -117,7 +118,7 @@ def video_feed(request):
 
 
     with camera_lock:
-        if not livestream_job and livestream_job.running:
+        if livestream_job and not livestream_job.running:
             livestream_job.start()
 
     def stream_generator():
@@ -184,7 +185,7 @@ def stream_page(request):
 
     livestream_job = get_livestream_job(CAMERA_URL, update_latest_frame)
 
-    if not livestream_job and livestream_job.running:
+    if livestream_job and not livestream_job.running:
         livestream_job.start()
 
     return render(request, "cameraapp/stream.html", {
