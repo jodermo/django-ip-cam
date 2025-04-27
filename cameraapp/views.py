@@ -172,16 +172,14 @@ def stream_page(request):
         with livestream_resume_lock:
             if not livestream_job.running:
                 livestream_job.start()
-                
+
     start_time = time.time()
-    while time.time() - start_time < 5:  # max 5 Sek. warten
-        with latest_frame_lock:
-            if latest_frame is not None:
-                print("[STREAM_PAGE] First frame received.")
-                break
+    while time.time() - start_time < 5:
+        frame = livestream_job.get_frame()
+        if frame is not None:
+            update_latest_frame(frame)
+            break
         time.sleep(0.2)
-    else:
-        print("[STREAM_PAGE] Timeout waiting for first frame.")
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,

@@ -147,6 +147,7 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
                 shared_capture=camera.cap
             )
             new_job.start()
+
             time.sleep(0.5)
             if not new_job.running:
                 raise RuntimeError("Livestream job did not start")
