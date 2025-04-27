@@ -22,3 +22,5 @@ class CameraAppConfig(AppConfig):
             start_camera_watchdog()
         except Exception as e:
             print(f"[CAMERA_APP] Failed to start scheduler/watchdog: {e}")
+
+

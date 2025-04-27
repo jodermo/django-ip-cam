@@ -5,6 +5,7 @@ import os
 import gc
 import cv2
 import subprocess
+import threading
 from django.apps import apps
 from cameraapp.camera_manager import CameraManager
 from cameraapp.livestream_job import LiveStreamJob
@@ -245,3 +246,28 @@ def force_device_reset(device_path="/dev/video0"):
         logger.error("Could not determine USB device ID from udevadm output")
     except Exception as e:
         logger.error(f"force_device_reset failed: {e}")
+
+
+def start_camera_watchdog(interval_sec=10):
+    """
+    Prüft regelmäßig, ob Kamera und Livestream aktiv sind.
+    Wenn nicht, wird ein Neustart versucht.
+    """
+    def loop():
+        while True:
+            try:
+                cam = app_globals.camera
+                if not cam or not cam.cap or not cam.cap.isOpened():
+                    logger.warning("[WATCHDOG] Camera not available. Trying to restart...")
+                    from .camera_core import init_camera
+                    init_camera()
+                elif app_globals.livestream_job and not app_globals.livestream_job.running:
+                    logger.warning("[WATCHDOG] Livestream not running. Restarting...")
+                    from .camera_utils import force_restart_livestream
+                    force_restart_livestream()
+            except Exception as e:
+                logger.error(f"[WATCHDOG] Exception: {e}")
+            time.sleep(interval_sec)
+
+    threading.Thread(target=loop, daemon=True).start()
+    logger.info("[WATCHDOG] Started camera watchdog thread.")
