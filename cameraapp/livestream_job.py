@@ -2,14 +2,13 @@
 
 import threading
 import time
-from .globals import camera_lock, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
+from .globals import livestream_lock
 from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
 
 class LiveStreamJob:
     def __init__(self, camera_source, frame_callback=None, shared_capture=None):
         self.camera_source = camera_source
         self.frame_callback = frame_callback
-        self.lock = threading.Lock()
         self.running = False
         self.latest_frame = None
         self.thread = None
@@ -24,7 +23,7 @@ class LiveStreamJob:
         self.thread.start()
 
     def stop(self):
-        with self.lock:
+        with livestream_lock:
             self.running = False
             if self.capture and not self.shared_capture:
                 self.capture.release()
@@ -77,7 +76,7 @@ class LiveStreamJob:
             if self.frame_callback:
                 self.frame_callback(frame)
 
-            with self.lock:
+            with livestream_lock:
                 self.latest_frame = frame.copy()
 
             time.sleep(0.03)
@@ -89,5 +88,5 @@ class LiveStreamJob:
         print("[LIVE_STREAM_JOB] Stopped.")
 
     def get_frame(self):
-        with self.lock:
+        with livestream_lock:
             return self.latest_frame.copy() if self.latest_frame is not None else None

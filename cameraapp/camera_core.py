@@ -1,12 +1,12 @@
+# cameraapp/camera_core.py
+
 import os
 import cv2
 import time
-# camera_core.py
-import cv2
 
-from . import globals
 from cameraapp.models import CameraSettings
-from .camera_utils import camera_lock, get_camera_settings, apply_cv_settings, try_open_camera
+from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera
+from .globals import camera_lock, camera_capture
 
 from dotenv import load_dotenv
 load_dotenv()
