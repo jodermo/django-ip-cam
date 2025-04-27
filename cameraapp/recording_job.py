@@ -16,8 +16,7 @@ class RecordingJob:
         fps: float,
         resolution: tuple[int, int],
         codec: str,
-        frame_provider: Callable[[], any],
-        lock: threading.Lock
+        frame_provider: Callable[[], any]
     ):
         self.filepath = filepath
         self.duration = duration
@@ -25,7 +24,6 @@ class RecordingJob:
         self.resolution = resolution
         self.codec = codec
         self.frame_provider = frame_provider
-        self.lock = lock
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.active = False
         self.frame_count = 0
@@ -52,23 +50,22 @@ class RecordingJob:
             return
 
         start_time = time.time()
-        max_wait = 5  # max seconds waiting for frames
-        empty_frame_start = None
+        max_wait = 5.0
+        wait_start = None
 
         while self.active and (time.time() - start_time) < self.duration:
-            with self.lock:
-                frame = self.frame_provider()
+            frame = self.frame_provider()
 
             if frame is None:
-                if empty_frame_start is None:
-                    empty_frame_start = time.time()
-                elif time.time() - empty_frame_start > max_wait:
+                if wait_start is None:
+                    wait_start = time.time()
+                elif time.time() - wait_start > max_wait:
                     logger.warning("[RecordingJob] No frames for too long → abort")
                     break
                 time.sleep(0.05)
                 continue
 
-            empty_frame_start = None
+            wait_start = None
 
             try:
                 resized = cv2.resize(frame, self.resolution)

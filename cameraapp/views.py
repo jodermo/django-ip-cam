@@ -82,8 +82,9 @@ def camera_status(request):
 
 
 def generate_frames():
+    global app_globals
     while True:
-        frame = get_latest_frame()
+        frame = app_globals.camera.get_latest_frame()
         if frame is None:
             time.sleep(0.05)
             continue
@@ -99,9 +100,6 @@ def generate_frames():
         time.sleep(0.05)
 
 
-def get_latest_frame():
-    with app_globals.latest_frame_lock:
-        return app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
 
 @csrf_exempt
 def video_feed(request):
@@ -109,7 +107,7 @@ def video_feed(request):
 
     def frame_generator():
         while True:
-            frame = get_latest_frame()
+            frame = app_globals.camera.get_latest_frame()
             if frame is not None:
                 ret, jpeg = cv2.imencode('.jpg', frame)
                 if ret:
@@ -308,8 +306,7 @@ def start_recording(request):
     filepath = os.path.join(RECORD_DIR, f"clip_{time.strftime('%Y%m%d-%H%M%S')}.mp4")
 
     def frame_provider():
-        with app_globals.latest_frame_lock:
-            return app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
+        return app_globals.camera.get_latest_frame() if app_globals.camera else None
 
     app_globals.recording_job = RecordingJob(
         filepath=filepath,
@@ -317,8 +314,7 @@ def start_recording(request):
         fps=fps,
         resolution=resolution,
         codec=codec,
-        frame_provider=frame_provider,
-        lock=app_globals.latest_frame_lock
+        frame_provider=frame_provider
     )
     app_globals.recording_job.start()
     return JsonResponse({"status": "started", "file": filepath})

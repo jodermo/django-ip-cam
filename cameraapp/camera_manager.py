@@ -134,6 +134,9 @@ class CameraManager:
         globals()["camera"] = None
 
 
+    def get_latest_frame(self):
+        with self.lock:
+            return self.frame.copy() if self.frame is not None else None
 
 
     def frame_provider():
