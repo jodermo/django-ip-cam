@@ -14,6 +14,8 @@ load_dotenv()
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
 CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
+camera_instance = None 
+
 
 def init_camera():
     global camera_capture

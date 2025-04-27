@@ -9,6 +9,7 @@ import fcntl
 import os
 import gc
 from django.apps import apps
+from .livestream_job import LiveStreamJob
 from .globals import camera_lock, camera_instance, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
 
 
@@ -136,14 +137,7 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
     Returns:
         LiveStreamJob or None on failure
     """
-    import os
-    import cv2
-    import time
-    import gc
-    from .livestream_job import LiveStreamJob
-    from .camera_core import camera_lock, camera_instance, try_open_camera
-    from .camera_utils import get_camera_settings, apply_cv_settings, force_device_reset
-    import logging
+
 
     logger = logging.getLogger(__name__)
     logger.info("[RESTART] Starting safe_restart_camera_stream...")
