@@ -59,6 +59,7 @@ def get_livestream_job(camera_source, frame_callback=None, shared_capture=None):
     global livestream_job
     from cameraapp.livestream_job import LiveStreamJob
     livestream_job = LiveStreamJob(camera_source, frame_callback, shared_capture)
+    globals()["livestream_job"] = livestream_job
     return livestream_job
 
 
@@ -72,6 +73,7 @@ livestream_job = get_livestream_job(
     frame_callback=lambda f: update_latest_frame(f),
     shared_capture=camera_instance
 )
+globals()["livestream_job"] = livestream_job
 
 def logout_view(request):
     logout(request)
@@ -191,7 +193,7 @@ def stream_page(request):
 
             if camera_instance and camera_instance.isOpened():
                 camera_instance.release()
-                time.sleep(1.0)
+                time.sleep(2.5)
 
             init_camera()
             if livestream_job:
@@ -202,7 +204,7 @@ def stream_page(request):
         frame_callback=lambda f: update_latest_frame(f),
         shared_capture=camera_instance
     )
-
+    globals()["livestream_job"] = livestream_job
     if livestream_job and not livestream_job.running:
         livestream_job.start()
 
@@ -474,27 +476,17 @@ def update_camera_settings(request):
 
             if camera_instance and camera_instance.isOpened():
                 camera_instance.release()
-                time.sleep(1.0)
+                time.sleep(2.5)
                 print("[UPDATE_CAMERA_SETTINGS] Camera released.")
 
-            new_cap = try_open_camera_safe(CAMERA_URL)
-            if not new_cap or not new_cap.isOpened():
-                print("[UPDATE_CAMERA_SETTINGS] Failed to reopen camera.")
-                camera_instance = None
-                livestream_job = None
-                return HttpResponseRedirect(reverse("stream_page"))
-
-            camera_instance = new_cap
-            apply_cv_settings(camera_instance, settings_obj, mode="video")
-            print("[UPDATE_CAMERA_SETTINGS] Camera reconfigured.")
-
-            livestream_job = get_livestream_job(
-                camera_source=CAMERA_URL,
+            livestream_job = safe_restart_camera_stream(
+                livestream_job_ref=livestream_job,
+                camera_url=CAMERA_URL,
                 frame_callback=lambda f: update_latest_frame(f),
-                shared_capture=camera_instance
+                retries=3,
+                delay=2.0
             )
             globals()["livestream_job"] = livestream_job
-            livestream_job.start()
             print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
 
         except Exception as e:

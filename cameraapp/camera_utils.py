@@ -72,7 +72,9 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
         if value < 0:
             print(f"[CAMERA_CORE] {name} disabled (value={value})")
             return
-
+        if name == "exposure" and exposure_mode == "auto":
+            print("[SKIP] Exposure ignored in auto mode.")
+            return
         cap_prop = getattr(cv2, f"CAP_PROP_{name.upper()}", None)
         if cap_prop is None:
             print(f"[WARNING] Unknown OpenCV property: {name}")
@@ -198,6 +200,7 @@ def force_restart_livestream():
             frame_callback=lambda f: setattr(globals(), 'latest_frame', f.copy()),
             shared_capture=cap
         )
+        globals()["livestream_job"] = livestream_job
         livestream_job.start()
         print("[LIVE] Livestream restarted.")
         return True

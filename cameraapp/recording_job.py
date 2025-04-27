@@ -39,6 +39,7 @@ def safe_restart_livestream():
     )
     job.start()
     app_globals.livestream_job = job
+    globals()["livestream_job"] = job
     logger.info("[RECORDING] Livestream restarted successfully.")
 
 
