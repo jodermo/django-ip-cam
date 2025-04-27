@@ -138,8 +138,6 @@ def safe_restart_camera_stream(frame_callback=None, camera_source=None):
             logger.info(f"CameraManager is being reinitialized with source: {camera_source}")
             try:
                 app_globals.camera = CameraManager(source=camera_source)
-                globals()["camera"] = app_globals.camera  # Fallback
-
                 if not app_globals.camera.is_available():
                     logger.error("Newly initialized CameraManager is not available")
                     return None
@@ -185,7 +183,7 @@ def force_restart_livestream():
     logger.info("force_restart_livestream called")
     return safe_restart_camera_stream(
         camera_source=os.getenv("CAMERA_URL", 0),
-        frame_callback=lambda f: setattr(__import__('cameraapp.globals', fromlist=['']), 'latest_frame', f.copy())
+        frame_callback=lambda f: setattr(__import__('.globals', fromlist=['']), 'latest_frame', f.copy())
     )
 
 
@@ -209,7 +207,6 @@ def release_and_reset_camera():
 def update_livestream_job(new_job):
     global app_globals
     app_globals.livestream_job = new_job
-    globals()["livestream_job"] = new_job
 
 
 def update_latest_frame(frame):

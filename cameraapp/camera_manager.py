@@ -5,8 +5,8 @@ import threading
 import time
 import os
 import atexit
+from .globals import app_globals
 
-global camera
 
 if globals().get("camera") is not None:
     print("[CameraManager] Warning: Existing camera instance found. Replacing it.")
@@ -38,7 +38,7 @@ class CameraManager:
         self.thread = threading.Thread(target=self._capture_loop, daemon=True)
         self.thread.start()
         globals()["camera"] = self
-        import cameraapp.globals as app_globals
+
         app_globals.camera = self
         
 

@@ -183,7 +183,6 @@ def stream_page(request):
             if not app_globals.livestream_job:
                 raise RuntimeError("Livestream konnte nicht gestartet werden.")
             print("[STREAM_PAGE] Livestream started successfully.")
-            globals()["livestream_job"] = app_globals.livestream_job
     except Exception as e:
         print(f"[STREAM_PAGE] Livestream konnte nicht gestartet werden: {e}")
         camera_error = "Kamera konnte nicht gestartet werden."
@@ -484,7 +483,6 @@ def reset_camera_settings(request):
             )
 
             if app_globals.livestream_job:
-                globals()["livestream_job"] = app_globals.livestream_job
                 print("[RESET_CAMERA_SETTINGS] Kamera erfolgreich neu gestartet.")
             else:
                 print("[RESET_CAMERA_SETTINGS] Neustart fehlgeschlagen.")
@@ -555,7 +553,6 @@ def update_camera_settings(request):
             print(f"[DEBUG] Result from restart: {app_globals.livestream_job}")
 
             if app_globals.livestream_job:
-                globals()["livestream_job"] = app_globals.livestream_job
                 print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
             else:
                 print("[UPDATE_CAMERA_SETTINGS] Restart failed — camera unavailable.")
@@ -710,8 +707,6 @@ def manual_restart_camera(request):
         frame_callback=lambda f: update_latest_frame(f),
         camera_source=CAMERA_URL
     )
-
-    globals()["livestream_job"] = app_globals.livestream_job
     return redirect("stream_page")
 
 
