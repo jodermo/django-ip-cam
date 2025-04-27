@@ -184,7 +184,7 @@ def stream_page(request):
 
     livestream_job = get_livestream_job(CAMERA_URL, update_latest_frame)
 
-    if not livestream_job.running:
+    if not livestream_job and livestream_job.running:
         livestream_job.start()
 
     return render(request, "cameraapp/stream.html", {
@@ -457,6 +457,9 @@ def update_camera_settings(request):
         print(f"[UPDATE_CAMERA_SETTINGS] Fehler beim Speichern: {e}")
         return HttpResponseRedirect(reverse("stream_page"))
 
+    if not livestream_job:
+            return
+    
     with camera_lock:
         livestream_job.stop()
         livestream_job.join(timeout=2.0)
