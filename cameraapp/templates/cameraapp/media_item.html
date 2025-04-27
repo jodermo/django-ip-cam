@@ -1,4 +1,5 @@
 <li>
+
     {% if item.type == "dir" %}
       <div class="folder-label"><strong>{{ item.name }}/</strong></div>
       <ul>
@@ -8,11 +9,15 @@
       </ul>
     {% elif item.type == "image" %}
       <div class="file-entry">
+        <p style="color: orange;">[DEBUG] {{ item.name }} | {{ item.url }} | {{ item.type }}</p>
+
         <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
         <img src="{{ item.url }}" width="320" style="margin-bottom: 10px;" />
       </div>
     {% elif item.type == "video" %}
       <div class="file-entry">
+        <p style="color: orange;">[DEBUG] {{ item.name }} | {{ item.url }} | {{ item.type }}</p>
+
         <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
         <video width="320" controls style="margin-bottom: 10px;">
           <source src="{{ item.url }}" type="video/mp4">
