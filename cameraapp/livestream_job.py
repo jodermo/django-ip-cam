@@ -32,10 +32,11 @@ class LiveStreamJob:
         max_retries: int = 5,
         base_delay: float = 2.0
     ):
+        global app_globals
+
         self.camera_source = camera_source
         self.frame_callback = frame_callback
         self.shared_capture = shared_capture
-        self.latest_frame: Optional[Any] = None
         self.running = False
         self.thread: Optional[threading.Thread] = None
         self.max_retries = max_retries
@@ -59,6 +60,7 @@ class LiveStreamJob:
         logger.info("LiveStreamJob started")
 
     def stop(self) -> None:
+        global app_globals
         with app_globals.livestream_lock:
             self.running = False
             if self.capture and not self.shared_capture:
@@ -105,9 +107,6 @@ class LiveStreamJob:
                         self.frame_callback(frame)
                     except Exception as cb_err:
                         logger.warning(f"Frame callback error: {cb_err}")
-
-                with app_globals.livestream_lock:
-                    self.latest_frame = frame.copy()
 
                 time.sleep(0.03)
 
@@ -161,9 +160,12 @@ class LiveStreamJob:
                 self.capture = None
 
     def get_frame(self) -> Optional[Any]:
-        with app_globals.livestream_lock:
-            return self.latest_frame.copy() if self.latest_frame is not None else None
+        global app_globals
+        with app_globals.latest_frame_lock:
+            return app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
+
         
     def is_camera_ready(self) -> bool:
+        global app_globals
         return hasattr(app_globals.camera, "cap") and app_globals.camera.cap and app_globals.camera.cap.isOpened()
 
