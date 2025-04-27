@@ -499,7 +499,6 @@ def update_camera_settings(request):
     return HttpResponseRedirect(reverse("stream_page"))
 
 
-
 @require_POST
 @login_required
 def update_photo_settings(request):
