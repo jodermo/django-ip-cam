@@ -105,9 +105,11 @@ def safe_restart_camera_stream(frame_callback=None, camera_source=None):
 
     # Fallback für frame_callback → aktualisiert globalen latest_frame
     if frame_callback is None:
-        def frame_callback(frame):
+        def default_callback(frame):
             with app_globals.latest_frame_lock:
                 app_globals.latest_frame = frame.copy()
+        frame_callback = default_callback
+
 
     # Debug zur Kamera
     if not app_globals.camera:
