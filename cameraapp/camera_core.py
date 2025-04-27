@@ -67,7 +67,7 @@ def init_camera():
             # Starte Livestream nur wenn nicht aktiv
             if not livestream_job or not livestream_job.running:
                 job = safe_restart_camera_stream(
-                    camera_source=source,
+                    camera_source=CAMERA_URL,
                     frame_callback=lambda f: update_latest_frame(f)
                 )
                 if job:

@@ -438,11 +438,8 @@ def reset_camera_settings(request):
             print("[RESET_CAMERA_SETTINGS] Kamera freigegeben.")
 
             livestream_job = safe_restart_camera_stream(
-                livestream_job_ref=livestream_job,
-                camera_url=CAMERA_URL,
-                frame_callback=lambda f: update_latest_frame(f),
-                retries=3,
-                delay=1.5
+                camera_source=CAMERA_URL,
+                frame_callback=lambda f: update_latest_frame(f)
             )
 
             if livestream_job:
