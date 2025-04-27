@@ -56,6 +56,10 @@ last_disconnect_time = None
 recording_job = None
 recording_timeout = 30
 
+livestream_job = None
+
+
+
 def get_livestream_job(camera_source, frame_callback=None):
     global livestream_job
     if livestream_job is None:
@@ -181,7 +185,7 @@ def stream_page(request):
                 livestream_job.start()
 
     livestream_job = get_livestream_job(CAMERA_URL, update_latest_frame)
-    
+
     if not livestream_job.running:
         livestream_job.start()
 
