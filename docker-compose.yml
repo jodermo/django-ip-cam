@@ -56,7 +56,6 @@ services:
       - .env
     volumes:
       - .:/app
-    privileged: true
     restart: unless-stopped
 
 volumes:
