@@ -75,7 +75,7 @@
 </style>
 
 <div id="streamContainer">
-  <img id="streamImage" alt="Live Stream">
+  <img id="streamImage" alt="Live Stream" src="{% url 'video_feed' %}">
 
   <div class="overlay-controls">
     <p><strong>User:</strong> {{ request.user.username }}</p>
@@ -218,7 +218,6 @@ document.getElementById("manual-restart-form").addEventListener("submit", functi
   setInterval(updateRecordingStatus, 3000);
   updateRecordingStatus();
 
-  document.getElementById("streamImage").src = "{% url 'video_feed' %}?t=" + Date.now();
 
 </script>
 {% endblock %}
