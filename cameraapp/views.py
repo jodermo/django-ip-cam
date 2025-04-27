@@ -605,24 +605,31 @@ def pause_livestream():
             print("[PHOTO] Livestream was paused for photo capture.")
             time.sleep(0.5)
 
-
 def resume_livestream():
     global app_globals
     with app_globals.livestream_resume_lock:
         print("[PHOTO] Attempting to resume livestream...")
 
-        # Stop current job if needed
         if app_globals.livestream_job:
             app_globals.livestream_job.stop()
             app_globals.livestream_job.join(timeout=2.0)
 
-        # Force restart using camera_utils helper
-        new_job = safe_restart_camera_stream(
+        # Re-initialize camera if needed
+        if not app_globals.camera or not app_globals.camera.is_available():
+            print("[PHOTO] Reinitializing CameraManager...")
+            try:
+                init_camera()
+            except Exception as e:
+                print(f"[PHOTO] Failed to reinitialize CameraManager: {e}")
+                return
+
+        # Start livestream
+        app_globals.livestream_job = safe_restart_camera_stream(
             frame_callback=update_latest_frame,
             camera_source=CAMERA_URL
         )
 
-        if new_job and new_job.running:
+        if app_globals.livestream_job and app_globals.livestream_job.running:
             print("[PHOTO] Livestream restarted successfully.")
         else:
             print("[PHOTO] Failed to restart livestream.")

@@ -8,7 +8,7 @@ import numpy as np
 from django.conf import settings
 from django.db import connections
 import logging
-
+from .camera_core import init_camera 
 from .camera_utils import apply_cv_settings, get_camera_settings, force_restart_livestream
 from .globals import app_globals
 
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
+
 
 
 def take_photo():
@@ -27,6 +28,7 @@ def take_photo():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
 
+    # === [1] Livestream: Aktuellen Frame verwenden ===
     if app_globals.livestream_job and app_globals.livestream_job.running:
         with app_globals.latest_frame_lock:
             if app_globals.latest_frame is not None:
@@ -42,13 +44,23 @@ def take_photo():
 
     logger.info("[PHOTO] Livestream not available. Trying fallback using CameraManager...")
 
+    # === [2] Kamera-Fallback ===
     with app_globals.camera_lock:
-        # Wait until cap is truly usable
+        if not app_globals.camera or not app_globals.camera.cap or not app_globals.camera.cap.isOpened():
+            logger.warning("[PHOTO] CameraManager not ready or cap not opened. Attempting reinitialization.")
+            try:
+                init_camera()
+            except Exception as e:
+                logger.error(f"[PHOTO] init_camera() failed: {e}")
+                return None
+
+        # Testweise Frame lesen, um Kamera zu stabilisieren
         max_attempts = 5
         for i in range(max_attempts):
             if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
                 ret, test_frame = app_globals.camera.cap.read()
                 if ret and test_frame is not None:
+                    logger.info(f"[PHOTO] Camera is ready (attempt {i+1})")
                     break
             logger.info(f"[PHOTO] Waiting for camera to stabilize... ({i+1}/{max_attempts})")
             time.sleep(1.0)
@@ -56,27 +68,32 @@ def take_photo():
             logger.error("[PHOTO] Camera not usable after wait.")
             return None
 
+        # Einstellungen anwenden
         settings = get_camera_settings()
         if settings:
-            apply_cv_settings(app_globals.camera, settings, mode="photo")
+            try:
+                apply_cv_settings(app_globals.camera, settings, mode="photo")
+            except Exception as e:
+                logger.warning(f"[PHOTO] Failed to apply photo settings: {e}")
 
-        # Actual capture
+        # Frame abholen
         frame = app_globals.camera.get_frame()
-
-
         if frame is None:
             logger.error("[PHOTO] Failed to capture frame from fallback.")
             return None
 
-        if cv2.imwrite(filepath, frame):
-            logger.info(f"[PHOTO] Saved from fallback capture: {filepath}")
-        else:
+        if not cv2.imwrite(filepath, frame):
             logger.error("[PHOTO] Failed to write fallback photo.")
             return None
 
+        logger.info(f"[PHOTO] Saved from fallback capture: {filepath}")
+
+    # === [3] Livestream neu starten ===
     logger.info("[PHOTO] Restarting livestream after fallback...")
     force_restart_livestream()
+
     return filepath
+
 
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
