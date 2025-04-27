@@ -3,7 +3,7 @@
 import os
 import cv2
 import time
-
+import threading
 from cameraapp.models import CameraSettings
 from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, force_restart_livestream
 from .globals import camera_lock, camera_capture
@@ -63,55 +63,25 @@ def reset_to_default():
         print("[RESET] Keine CameraSettings gefunden. Abbruch.")
         return
 
-    # Reset für Foto-Modus
-    settings.photo_exposure_mode = "auto"
-    settings.photo_brightness = -1
-    settings.photo_contrast = -1
-    settings.photo_saturation = -1
-    settings.photo_exposure = -1
-    settings.photo_gain = -1
+    # Foto-Modus
+    settings.photo_exposure_mode = "manual"   # "auto" kann flackern, manual ist stabiler
+    settings.photo_brightness = 128.0         # Bereich meist 0–255
+    settings.photo_contrast = 32.0            # Bereich meist 0–255
+    settings.photo_saturation = 64.0          # Bereich meist 0–255
+    settings.photo_exposure = -6.0            # Bereich meist -13 bis -1 (dunkel → hell)
+    settings.photo_gain = 4.0                 # Bereich meist 0–10
 
-    # Reset für Video-Modus
-    settings.video_exposure_mode = "auto"
-    settings.video_brightness = -1
-    settings.video_contrast = -1
-    settings.video_saturation = -1
-    settings.video_exposure = -1
-    settings.video_gain = -1
+    # Video-Modus
+    settings.video_exposure_mode = "auto"     # Auto-Exposure ist okay für Video
+    settings.video_brightness = 128.0
+    settings.video_contrast = 32.0
+    settings.video_saturation = 64.0
+    settings.video_exposure = -6.0            # Ignoriert bei Auto, aber gesetzt für fallback
+    settings.video_gain = 4.0
+
 
     settings.save()
     print("[RESET] CameraSettings auf Default zurückgesetzt (Auto-Modus, keine Werte gesetzt).")
-
-    def delayed_reinit():
-        time.sleep(1.0)
-        init_camera()
-
-    threading.Thread(target=delayed_reinit).start()
-
-def reset_to_default():
-    settings = CameraSettings.objects.first()
-    if not settings:
-        print("[RESET] No CameraSettings found. Aborting.")
-        return
-
-    # Reset photo mode
-    settings.photo_exposure_mode = "auto"
-    settings.photo_brightness = -1
-    settings.photo_contrast = -1
-    settings.photo_saturation = -1
-    settings.photo_exposure = -1
-    settings.photo_gain = -1
-
-    # Reset video mode
-    settings.video_exposure_mode = "auto"
-    settings.video_brightness = -1
-    settings.video_contrast = -1
-    settings.video_saturation = -1
-    settings.video_exposure = -1
-    settings.video_gain = -1
-
-    settings.save()
-    print("[RESET] CameraSettings reset to default (auto mode, no values set).")
 
     def delayed_reinit():
         time.sleep(1.0)
@@ -148,16 +118,27 @@ def apply_video_settings(cap):
             print(f"[VIDEO] Set {param} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
 
 
-def apply_auto_settings(settings):
-    settings.photo_exposure_mode = "auto"
-    settings.photo_brightness = -1
-    settings.photo_contrast = -1
-    settings.photo_saturation = -1
-    settings.photo_exposure = -1
-    settings.photo_gain = -1
-    settings.save()
-    print("[CAMERA_CORE] Auto photo settings applied (mode=auto, all = -1)")
+def apply_auto_settings(settings, mode="photo"):
+    if mode == "photo":
+        settings.photo_exposure_mode = "auto"
+        settings.photo_brightness = 128.0
+        settings.photo_contrast = 32.0
+        settings.photo_saturation = 64.0
+        settings.photo_exposure = -1   # ignoriert bei auto
+        settings.photo_gain = -1       # ignoriert bei auto
+    elif mode == "video":
+        settings.video_exposure_mode = "auto"
+        settings.video_brightness = 128.0
+        settings.video_contrast = 32.0
+        settings.video_saturation = 64.0
+        settings.video_exposure = -1
+        settings.video_gain = -1
+    else:
+        print(f"[CAMERA_CORE] Unknown mode for auto settings: {mode}")
+        return
 
+    settings.save()
+    print(f"[CAMERA_CORE] Auto {mode} settings applied.")
 
 
 def get_shared_camera():
