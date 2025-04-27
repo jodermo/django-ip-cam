@@ -35,12 +35,20 @@ class LiveStreamJob:
         self.camera_source = camera_source
         self.frame_callback = frame_callback
         self.shared_capture = shared_capture
-        self.capture = shared_capture or (camera.cap if camera else None)
         self.latest_frame: Optional[Any] = None
         self.running = False
         self.thread: Optional[threading.Thread] = None
         self.max_retries = max_retries
         self.base_delay = base_delay
+
+        if shared_capture is not None:
+            self.capture = shared_capture
+        elif camera and getattr(camera, "cap", None) and camera.cap.isOpened():
+            self.capture = camera.cap
+        else:
+            logger.error("LiveStreamJob initialized without valid capture source.")
+            self.capture = None
+
 
     def start(self) -> None:
         if self.running:
@@ -132,14 +140,19 @@ class LiveStreamJob:
         logger.error("Exceeded maximum retry attempts. Trying forced reset.")
         try:
             device_path = str(self.camera_source) if isinstance(self.camera_source, str) else "/dev/video0"
+            logger.warning(f"Attempting forced reset of device: {device_path}")
             force_device_reset(device_path)
             time.sleep(3)
         except Exception as e:
             logger.error(f"force_device_reset failed: {e}")
 
         if self.is_camera_ready():
+            logger.info("Camera ready after forced reset.")
             return camera.cap
+
+        logger.error("Camera still not available after forced reset.")
         return None
+
 
 
     def _cleanup(self) -> None:
