@@ -193,7 +193,22 @@ def stream_page(request):
 
             if camera_instance and camera_instance.isOpened():
                 camera_instance.release()
-                time.sleep(2.5)
+                print("[RELEASE] Camera released. Verifiziere Freigabe...")
+                for i in range(5):
+                    if os.path.exists("/dev/video0"):
+                        try:
+                            test_cap = cv2.VideoCapture(0)
+                            if test_cap.isOpened():
+                                test_cap.release()
+                                print("[RELEASE] Kamera testweise geöffnet → Freigabe erfolgreich.")
+                                break
+                        except:
+                            pass
+                    print(f"[RELEASE] Versuch {i+1} – Kamera noch blockiert...")
+                    time.sleep(1.0)
+                else:
+                    print("[RELEASE] Kamera nach 5 Versuchen nicht freigegeben. Fortfahren mit Risiko.")
+
 
             init_camera()
             if livestream_job:
@@ -488,8 +503,22 @@ def update_camera_settings(request):
             # Release camera instance safely
             if camera_instance and camera_instance.isOpened():
                 camera_instance.release()
-                print("[UPDATE_CAMERA_SETTINGS] Camera released.")
-                time.sleep(2.5)  # Allow hardware to reset
+                print("[RELEASE] Camera released. Verifiziere Freigabe...")
+                for i in range(5):
+                    if os.path.exists("/dev/video0"):
+                        try:
+                            test_cap = cv2.VideoCapture(0)
+                            if test_cap.isOpened():
+                                test_cap.release()
+                                print("[RELEASE] Kamera testweise geöffnet → Freigabe erfolgreich.")
+                                break
+                        except:
+                            pass
+                    print(f"[RELEASE] Versuch {i+1} – Kamera noch blockiert...")
+                    time.sleep(1.0)
+                else:
+                    print("[RELEASE] Kamera nach 5 Versuchen nicht freigegeben. Fortfahren mit Risiko.")
+
 
             # Restart using robust helper
             print("[DEBUG] Calling safe_restart_camera_stream...")

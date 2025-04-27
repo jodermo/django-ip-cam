@@ -1,4 +1,5 @@
 # cameraapp/camera_utils.py
+
 import logging
 import time
 import threading
@@ -110,7 +111,8 @@ def try_open_camera(camera_source, retries=3, delay=1.0):
     print(f"[DEBUG] try_open_camera: source={camera_source}, retries={retries}, delay={delay}")
     for i in range(retries):
         print(f"[DEBUG] Attempt {i + 1} to open camera...")
-        cap = cv2.VideoCapture(camera_source)
+        cv2.destroyAllWindows()
+        cap = cv2.VideoCapture(camera_source, cv2.CAP_V4L2)       
         if cap.isOpened():
             print("[DEBUG] Camera opened successfully.")
             return cap
@@ -140,6 +142,22 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
     with camera_lock:
         if camera_instance and camera_instance.isOpened():
             camera_instance.release()
+            print("[RELEASE] Camera released. Verifiziere Freigabe...")
+            for i in range(5):
+                if os.path.exists("/dev/video0"):
+                    try:
+                        test_cap = cv2.VideoCapture(0)
+                        if test_cap.isOpened():
+                            test_cap.release()
+                            print("[RELEASE] Kamera testweise geöffnet → Freigabe erfolgreich.")
+                            break
+                    except:
+                        pass
+                print(f"[RELEASE] Versuch {i+1} – Kamera noch blockiert...")
+                time.sleep(1.0)
+            else:
+                print("[RELEASE] Kamera nach 5 Versuchen nicht freigegeben. Fortfahren mit Risiko.")
+
             print("[RELEASE] Camera released.")
 
             try:

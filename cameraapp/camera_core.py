@@ -40,14 +40,6 @@ def init_camera():
             print("[CAMERA_CORE] No CameraSettings found in DB.")
             return
 
-        exposure_mode = getattr(settings, "video_exposure_mode", "manual")
-        if exposure_mode == "auto":
-            print("[CAMERA_CORE] Setting exposure mode to AUTO.")
-            camera_capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
-        else:
-            print("[CAMERA_CORE] Setting exposure mode to MANUAL.")
-            camera_capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
-
         apply_cv_settings(
             camera_capture,
             settings,
