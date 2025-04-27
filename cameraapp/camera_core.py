@@ -75,11 +75,10 @@ def reset_to_default():
     settings.save()
     print("[RESET] CameraSettings auf Default zurückgesetzt (Auto-Modus, keine Werte gesetzt).")
 
-    def delayed_reinit():
-        time.sleep(1.0)
-        init_camera()
+    time.sleep(1.0)
+    init_camera()
 
-    threading.Thread(target=delayed_reinit).start()
+
 
 
 
