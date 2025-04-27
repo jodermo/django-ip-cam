@@ -125,13 +125,15 @@
   
       <button type="submit" style="margin-top: 1em;">✅ Apply</button>
     </form>
+
+    <form id="manual-restart-form" method="post" action="{% url 'manual_restart_camera' %}">
+      {% csrf_token %}
+      <button type="submit" id="manual-restart-btn">📷 Kamera neu starten</button>
+    </form>
+    
+  
   </div>
 
-  <form id="manual-restart-form" method="post" action="{% url 'manual_restart_camera' %}">
-    {% csrf_token %}
-    <button type="submit" id="manual-restart-btn">📷 Kamera neu starten</button>
-  </form>
-  
 
 
 </div>
@@ -165,7 +167,7 @@ document.getElementById("manual-restart-form").addEventListener("submit", functi
           btn.disabled = false;
       });
   });
-  
+
   function toggleSettings() {
     const popup = document.getElementById("settingsPopup");
     popup.style.display = popup.style.display === "block" ? "none" : "block";

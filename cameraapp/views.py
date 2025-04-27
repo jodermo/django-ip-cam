@@ -97,22 +97,53 @@ def reboot_pi(request):
         return render(request, "cameraapp/rebooting.html")
     return redirect("settings_view")
 
-@csrf_exempt 
+@csrf_exempt
 def reset_camera_settings(request):
     if request.method == "POST":
-        reset_to_default()
-    return redirect("stream_page")
+        from cameraapp.camera_utils import safe_restart_camera_stream
+        from cameraapp.views import update_latest_frame
+        from cameraapp.globals import livestream_job, camera_instance
 
+        with camera_lock:
+            if camera_instance and camera_instance.isOpened():
+                camera_instance.release()
+                print("[RESET_CAMERA] Kamera freigegeben.")
+                time.sleep(2.0)
 
-def live_stream_view(request):
-    # Sicherstellen, dass Livestream läuft
-    if not livestream_job or not livestream_job.running:
-        print("[VIEW] Livestream not running, attempting restart...")
-        force_restart_livestream()
+            # Stelle sicher, dass /dev/video0 wirklich frei ist
+            for i in range(5):
+                if os.path.exists("/dev/video0"):
+                    try:
+                        test_cap = cv2.VideoCapture(0)
+                        if test_cap.isOpened():
+                            test_cap.release()
+                            print("[RESET_CAMERA] Kamera testweise geöffnet → Freigabe erfolgreich.")
+                            break
+                    except:
+                        pass
+                print(f"[RESET_CAMERA] Versuch {i+1} – Kamera noch blockiert...")
+                time.sleep(1.0)
+            else:
+                print("[RESET_CAMERA] Kamera nach 5 Versuchen nicht freigegeben. Fortfahren mit Risiko.")
 
-    return render(request, "camera/live.html", {
-        # ggf. weitere context-Variablen
-    })
+            reset_to_default()
+            time.sleep(1.0)
+
+            livestream_job = safe_restart_camera_stream(
+                livestream_job_ref=livestream_job,
+                camera_url=CAMERA_URL,
+                frame_callback=lambda f: update_latest_frame(f),
+                retries=5,
+                delay=2.0
+            )
+            if livestream_job:
+                globals()["livestream_job"] = livestream_job
+                print("[RESET_CAMERA] Restart erfolgreich.")
+            else:
+                print("[RESET_CAMERA] Restart fehlgeschlagen.")
+
+    return redirect("settings_view")
+
 
 
 def generate_frames():
@@ -275,7 +306,6 @@ def record_video(request):
 def reset_camera_view(request):
     reset_to_default()
     time.sleep(0.5)
-    init_camera()
     return redirect("settings_page")  # oder wo du zurück willst
 
 
