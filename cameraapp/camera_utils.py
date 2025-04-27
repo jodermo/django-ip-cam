@@ -176,6 +176,7 @@ def force_restart_livestream():
     Ensure livestream is stopped and restarted cleanly.
     """
     global livestream_job
+    time.sleep(0.5)
     with camera_lock:
         if livestream_job and livestream_job.running:
             print("[LIVE] Stopping livestream for restart...")

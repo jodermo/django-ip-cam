@@ -19,9 +19,7 @@ os.makedirs(PHOTO_DIR, exist_ok=True)
 
 def take_photo():
     """
-    Capture a photo from the shared livestream frame.
-    If unavailable and livestream is not running, use fallback camera snap.
-    Also restart livestream if it is not running after capture.
+    Capture a photo from livestream or fallback directly from webcam.
     """
     used_fallback = False
 
@@ -48,8 +46,12 @@ def take_photo():
 
         apply_cv_settings(cap, settings, mode="photo")
         time.sleep(0.3)
+
         ret, frame = cap.read()
+
+        # Sehr wichtig: Kamera *richtig* schließen und Delay einbauen
         cap.release()
+        time.sleep(0.5)
 
         if not ret or frame is None:
             print("[PHOTO] Failed to capture fallback frame.")
@@ -64,12 +66,16 @@ def take_photo():
             print("[PHOTO] Failed to save fallback frame.")
             return False
 
-    # Restart livestream if we used fallback
     if used_fallback:
         print("[PHOTO] Restarting livestream after fallback photo.")
+        # Wiederum Delay, um sicherzustellen, dass das Device wirklich frei ist
+        time.sleep(0.5)
         force_restart_livestream()
 
     return True
+
+
+
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
     """
