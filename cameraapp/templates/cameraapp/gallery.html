@@ -139,9 +139,11 @@
   <canvas id="photoCanvas" width="640" height="480"></canvas>
 
   <div class="overlay-controls">
+    <button onclick="firstImage()">⏮ First</button>
     <button onclick="prevImage()">⏪ Prev</button>
     <button onclick="togglePlayPause()" id="playPauseBtn">▶️ Play</button>
     <button onclick="nextImage()">⏩ Next</button>
+    <button onclick="lastImage()">⏭ Last</button>
     <button onclick="autoAdjust()">🌞 Auto Adjust</button>
     <button onclick="takePhoto()">📷 Take Photo</button>
     <button onclick="toggleSettings()">⚙️ Settings</button>
@@ -208,6 +210,15 @@
 
   const canvas = document.getElementById("photoCanvas");
   const ctx = canvas.getContext("2d");
+
+
+  function firstImage() {
+    showImage(0);
+  }
+
+  function lastImage() {
+    showImage(photos.length - 1);
+  }
 
   function toggleSettings() {
     const popup = document.getElementById("settingsPopup");
