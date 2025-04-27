@@ -60,7 +60,7 @@ class LiveStreamJob:
         while self.running:
             ret, frame = self.capture.read()
             if not ret:
-                print("[LIVE_STREAM_JOB] Frame read failed, releasing and retrying...")
+                print("[LIVE_STREAM_JOB] Frame read failed. Capture open:", self.capture.isOpened())
                 self.capture.release()
                 self.capture = reconnect()
                 if not self.capture:

@@ -13,12 +13,21 @@ CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
 camera_instance = None
 
-def try_open_camera(url, retries=3):
-    for _ in range(retries):
-        cap = cv2.VideoCapture(url)
+def try_open_camera(camera_source, retries=3, delay=1.0):
+    import cv2
+    import time
+    print(f"[DEBUG] try_open_camera: source={camera_source}, retries={retries}, delay={delay}")
+    for i in range(retries):
+        print(f"[DEBUG] Attempt {i + 1} to open camera...")
+        cap = cv2.VideoCapture(camera_source)
         if cap.isOpened():
+            print("[DEBUG] Camera opened successfully.")
             return cap
+        else:
+            print("[DEBUG] Camera not opened, retrying...")
         cap.release()
+        time.sleep(delay)
+    print("[DEBUG] All attempts failed. Returning None.")
     return None
 
 
