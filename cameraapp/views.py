@@ -134,7 +134,6 @@ def video_feed(request):
         content_type="multipart/x-mixed-replace; boundary=frame"
     )
 
-
 @login_required
 def stream_page(request):
     global app_globals
@@ -142,36 +141,68 @@ def stream_page(request):
     settings_obj = get_camera_settings_safe(connection)
     camera_error = None
 
-    if not app_globals.camera or not app_globals.camera.is_available():
-        print("[STREAM_PAGE] Camera is not available, initializing...")
-        init_camera()
+    # ========== [1] ALTE STREAMS STOPPEN ==========
+    if app_globals.livestream_job and app_globals.livestream_job.running:
+        print("[STREAM_PAGE] Existing livestream found → stopping it.")
+        try:
+            app_globals.livestream_job.stop()
+            app_globals.livestream_job.join(timeout=2.0)
+        except Exception as e:
+            print(f"[STREAM_PAGE] Error stopping previous stream: {e}")
+        app_globals.livestream_job = None
 
-    if not app_globals.livestream_job or not app_globals.livestream_job.running:
-        print("[STREAM_PAGE] Livestream not active, starting...")
+    # ========== [2] KAMERA NEU INITIALISIEREN ==========
+    try:
+        release_and_reset_camera()
+        init_camera()
+        print("[STREAM_PAGE] Camera initialized successfully.")
+    except Exception as e:
+        print(f"[STREAM_PAGE] Failed to initialize camera: {e}")
+        camera_error = "Kamera konnte nicht initialisiert werden."
+        return render(request, "cameraapp/stream.html", {
+            "camera_error": camera_error,
+            "title": "Live Stream",
+            "viewer_count": app_globals.active_stream_viewers,
+            "settings": settings_obj
+        })
+
+    # ========== [3] NEUEN LIVESTREAM STARTEN ==========
+    try:
         with app_globals.livestream_resume_lock:
             app_globals.livestream_job = safe_restart_camera_stream(
                 frame_callback=update_latest_frame,
                 camera_source=CAMERA_URL
             )
-            if app_globals.livestream_job:
-                globals()["livestream_job"] = app_globals.livestream_job
-                print("[STREAM_PAGE] Livestream started successfully.")
-            else:
-                print("[STREAM_PAGE] Failed to start livestream.")
-                camera_error = "Kamera konnte nicht gestartet werden."
+            if not app_globals.livestream_job:
+                raise RuntimeError("Livestream konnte nicht gestartet werden.")
+            print("[STREAM_PAGE] Livestream started successfully.")
+            globals()["livestream_job"] = app_globals.livestream_job
+    except Exception as e:
+        print(f"[STREAM_PAGE] Livestream konnte nicht gestartet werden: {e}")
+        camera_error = "Kamera konnte nicht gestartet werden."
+        return render(request, "cameraapp/stream.html", {
+            "camera_error": camera_error,
+            "title": "Live Stream",
+            "viewer_count": app_globals.active_stream_viewers,
+            "settings": settings_obj
+        })
 
-    # Warte auf ersten Frame
+    # ========== [4] AUF ERSTEN FRAME WARTEN ==========
     start_time = time.time()
+    first_frame_received = False
+
     while time.time() - start_time < 5:
         if app_globals.livestream_job and app_globals.livestream_job.running:
             frame = app_globals.livestream_job.get_frame()
             if frame is not None:
                 update_latest_frame(frame)
-                print("[STREAM_PAGE] First frame received.")
+                print("[STREAM_PAGE] First frame received from stream.")
+                first_frame_received = True
                 break
         time.sleep(0.2)
-    else:
-        print("[STREAM_PAGE] Timeout waiting for first frame.")
+
+    if not first_frame_received:
+        print("[STREAM_PAGE] Timeout: Kein Frame empfangen.")
         camera_error = "Kein Bildsignal von Kamera erhalten."
 
     return render(request, "cameraapp/stream.html", {

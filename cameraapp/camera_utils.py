@@ -212,11 +212,12 @@ def update_livestream_job(new_job):
     globals()["livestream_job"] = new_job
 
 
-def update_latest_frame(f):
-    print("[DEBUG] update_latest_frame called.")
-    import cameraapp.globals as app_globals
+def update_latest_frame(frame):
+    global app_globals
     with app_globals.latest_frame_lock:
-        app_globals.latest_frame = f.copy()
+        app_globals.latest_frame = frame.copy()
+    print("[update_latest_frame] Frame updated.")
+
 
 
 def force_device_reset(device_path="/dev/video0"):
