@@ -7,7 +7,9 @@ from django.conf import settings
 from django.apps import apps
 from django.db import connections
 from .globals import latest_frame, latest_frame_lock
-from .camera_core import apply_cv_settings, get_camera_settings
+from .livestream_job import LiveStreamJob
+from .globals import livestream_job
+from .camera_core import try_open_camera, apply_cv_settings, get_camera_settings
 import numpy as np
 
 # Ensure photo directory exists
@@ -20,7 +22,12 @@ def get_camera_settings():
     return CameraSettings.objects.first()
 
 
+def update_latest_frame(frame):
+    with latest_frame_lock:
+        latest_frame = frame.copy()
+
 def take_photo():
+    global livestream_job
     from .globals import latest_frame, latest_frame_lock
 
     with latest_frame_lock:
@@ -50,7 +57,27 @@ def take_photo():
             filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
             if cv2.imwrite(filepath, frame):
                 print(f"[PHOTO] Saved from fallback: {filepath}")
+                print("[PHOTO] Livestream was paused for photo capture.")
+
+                if livestream_job and livestream_job.running:
+                    livestream_job.stop()
+                    livestream_job.join(timeout=2.0)
+
+                print("[PHOTO] Waiting for camera release...")
+                time.sleep(1.0)
+
+                new_cap = try_open_camera(int(os.getenv("CAMERA_URL", "0")), retries=3, delay=1.0)
+                if new_cap and new_cap.isOpened():
+                    apply_cv_settings(new_cap, settings, mode="video")
+                    new_job = LiveStreamJob(int(os.getenv("CAMERA_URL", "0")), frame_callback=update_latest_frame, shared_capture=new_cap)
+                    new_job.start()
+                    livestream_job = new_job
+                    print("[PHOTO] Livestream restarted successfully.")
+                else:
+                    print("[PHOTO] Livestream restart failed.")
+
                 return True
+
     except Exception as e:
         print(f"[PHOTO] Exception: {e}")
     return False

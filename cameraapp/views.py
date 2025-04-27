@@ -39,7 +39,7 @@ from .globals import camera_lock, latest_frame, latest_frame_lock
 
 from dotenv import load_dotenv
 load_dotenv()
-
+livestream_resume_lock = threading.Lock()
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
 CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
@@ -528,10 +528,12 @@ def pause_livestream():
 
 
 def resume_livestream():
-    print("[PHOTO] Waiting for camera release...")
-    time.sleep(1.5)
+    with livestream_resume_lock:
+        if livestream_job.running:
+            return
+        print("[PHOTO] Waiting for camera release...")
+        time.sleep(1.5)
 
-    if not livestream_job.running:
         for attempt in range(3):
             livestream_job.start()
             time.sleep(1.0)

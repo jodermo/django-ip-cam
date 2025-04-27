@@ -7,6 +7,9 @@ import threading
 from django.apps import apps
 from .globals import camera_lock, latest_frame, latest_frame_lock
 from cameraapp.models import CameraSettings
+from .livestream_job import LiveStreamJob
+from . import camera_core
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -305,3 +308,25 @@ def apply_photo_settings(camera, settings):
 
 def enable_auto_exposure(cap):
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+
+
+
+def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback):
+    from .camera_core import try_open_camera, apply_cv_settings, get_camera_settings
+
+    with camera_lock:
+        if livestream_job_ref and livestream_job_ref.running:
+            livestream_job_ref.stop()
+            livestream_job_ref.join(timeout=2.0)
+
+        cap = try_open_camera(camera_url, retries=3, delay=2.0)
+        if not cap or not cap.isOpened():
+            print("[RESTART] Camera still not available.")
+            return None
+
+        settings = get_camera_settings()
+        apply_cv_settings(cap, settings, mode="video")
+
+        job = LiveStreamJob(camera_url, frame_callback=frame_callback, shared_capture=cap)
+        job.start()
+        return job

@@ -4,6 +4,31 @@ import threading
 import time
 import cv2
 import os
+from .globals import livestream_job
+from .livestream_job import LiveStreamJob
+from .camera_core import try_open_camera, apply_cv_settings, get_camera_settings
+
+
+def safe_restart_livestream():
+    global livestream_job
+    if livestream_job and livestream_job.running:
+        livestream_job.stop()
+        livestream_job.join(timeout=2.0)
+
+    time.sleep(1.0)
+    settings = get_camera_settings()
+    cap = try_open_camera(int(os.getenv("CAMERA_URL", "0")), retries=3, delay=1.0)
+    if cap and cap.isOpened():
+        apply_cv_settings(cap, settings, mode="video")
+        livestream_job = LiveStreamJob(
+            int(os.getenv("CAMERA_URL", "0")),
+            frame_callback=lambda f: setattr(__import__('cameraapp.globals'), 'latest_frame', f.copy()),
+            shared_capture=cap
+        )
+        livestream_job.start()
+        print("[RECORDING] Livestream restarted.")
+    else:
+        print("[RECORDING] Failed to restart livestream.")
 
 class RecordingJob:
     def __init__(self, filepath, duration, fps, resolution, codec, frame_provider, lock):
@@ -69,6 +94,7 @@ class RecordingJob:
         out.release()
         self.active = False
         print(f"[RecordingJob] Finished: {self.filepath}, total frames: {self.frame_count}")
+        safe_restart_livestream()
 
     def stop(self):
         print(f"[RecordingJob] Stop requested for: {self.filepath}")

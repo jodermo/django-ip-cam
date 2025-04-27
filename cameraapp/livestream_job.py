@@ -32,6 +32,13 @@ class LiveStreamJob:
         time.sleep(1.0)
         self.start()
 
+    def recover(self):
+        print("[LIVE_STREAM_JOB] Attempting recovery...")
+        self.stop()
+        self.join(timeout=2.0)
+        time.sleep(1.0)
+        self.start()
+
     def join(self, timeout=None):
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout)
