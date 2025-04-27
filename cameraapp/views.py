@@ -35,6 +35,7 @@ from .globals import (
     livestream_resume_lock, livestream_job, taking_foto,
     camera_instance, camera_capture,
     active_stream_viewers, last_disconnect_time, recording_timeout,
+    recording_job,
 )
 from .recording_job import RecordingJob
 from .scheduler import take_photo 
@@ -335,6 +336,7 @@ def stop_recording(request):
 def is_recording(request):
     state = recording_job.active if recording_job else False
     return JsonResponse({"recording": state})
+
 
 @login_required
 def photo_gallery(request):
