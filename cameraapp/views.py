@@ -430,6 +430,7 @@ def media_browser(request):
     ]
     return render(request, "cameraapp/media_browser.html", {"media_tree": media_tree, "title": "Media Browser"})
 
+
 @require_POST
 @login_required
 def update_camera_settings(request):
@@ -443,19 +444,27 @@ def update_camera_settings(request):
 
         print("[UPDATE_CAMERA_SETTINGS] Request received:", dict(request.POST))
 
+        # Update numeric video parameters
         for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
             value = request.POST.get(f"video_{param}")
             if value is not None:
                 try:
-                    setattr(settings_obj, f"video_{param}", float(value))
-                    print(f"[UPDATE_CAMERA_SETTINGS] Set video_{param} = {value}")
+                    float_value = float(value)
+                    setattr(settings_obj, f"video_{param}", float_value)
+                    print(f"[UPDATE_CAMERA_SETTINGS] Set video_{param} = {float_value}")
                 except ValueError:
                     print(f"[UPDATE_CAMERA_SETTINGS] Invalid value for {param}: {value}")
 
+        # Update exposure mode
         exposure_mode = request.POST.get("video_exposure_mode")
         if exposure_mode in ["auto", "manual"]:
             settings_obj.video_exposure_mode = exposure_mode
             print(f"[UPDATE_CAMERA_SETTINGS] Set video_exposure_mode = {exposure_mode}")
+
+            # Reset exposure value if mode is auto (avoids instability)
+            if exposure_mode == "auto":
+                settings_obj.video_exposure = -1.0
+                print("[UPDATE_CAMERA_SETTINGS] Reset video_exposure to -1.0 due to auto mode")
 
         settings_obj.save()
         print("[UPDATE_CAMERA_SETTINGS] Settings saved.")
@@ -464,21 +473,25 @@ def update_camera_settings(request):
         print(f"[UPDATE_CAMERA_SETTINGS] Error during settings update: {e}")
         return HttpResponseRedirect(reverse("stream_page"))
 
+    # Ensure livestream_job is present before trying to restart
     if not livestream_job:
         print("[UPDATE_CAMERA_SETTINGS] No livestream_job active.")
         return HttpResponseRedirect(reverse("stream_page"))
 
     with camera_lock:
         try:
+            # Stop existing job cleanly
             livestream_job.stop()
             livestream_job.join(timeout=2.0)
             print("[UPDATE_CAMERA_SETTINGS] Livestream stopped.")
 
+            # Release camera instance safely
             if camera_instance and camera_instance.isOpened():
                 camera_instance.release()
-                time.sleep(2.5)
                 print("[UPDATE_CAMERA_SETTINGS] Camera released.")
+                time.sleep(2.5)  # Allow hardware to reset
 
+            # Restart using robust helper
             livestream_job = safe_restart_camera_stream(
                 livestream_job_ref=livestream_job,
                 camera_url=CAMERA_URL,
@@ -486,13 +499,18 @@ def update_camera_settings(request):
                 retries=3,
                 delay=2.0
             )
-            globals()["livestream_job"] = livestream_job
-            print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
+
+            if livestream_job:
+                globals()["livestream_job"] = livestream_job
+                print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
+            else:
+                print("[UPDATE_CAMERA_SETTINGS] Restart failed — camera unavailable.")
 
         except Exception as e:
             print(f"[UPDATE_CAMERA_SETTINGS] Error restarting livestream: {e}")
 
     return HttpResponseRedirect(reverse("stream_page"))
+
 
 
 @require_POST

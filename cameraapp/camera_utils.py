@@ -95,8 +95,11 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     apply_param("gain", 0.0, 10.0)
 
     if exposure_mode == "manual":
-        # For many cameras: valid range is -1 to -13 (lower = darker)
+        # Valid exposure range only applied when in manual mode
         apply_param("exposure", -13.0, -1.0)
+    else:
+        print("[SKIP] Exposure setting ignored in auto exposure mode.")
+
 
 
 
