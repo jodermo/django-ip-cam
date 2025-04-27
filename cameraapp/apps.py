@@ -9,7 +9,6 @@ class CameraAppConfig(AppConfig):
     name = "cameraapp"
 
     def ready(self):
-
         run_timelapse = os.environ.get("RUN_TIMELAPSE", "1") == "1"
         print(f"[CAMERA_APP] App ready. RUN_TIMELAPSE = {run_timelapse}")
 

@@ -24,6 +24,7 @@ def take_photo():
     Capture a photo from the livestream, or fallback directly from CameraManager.
     Returns file path on success, None on failure.
     """
+    print("[DEBUG] take_photo called")
     global app_globals
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
