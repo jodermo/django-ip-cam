@@ -81,43 +81,23 @@ def camera_status(request):
     return JsonResponse({"camera_url": str(CAMERA_URL)})
 
 
-
 def generate_frames():
-    """
-    Generator-Funktion, die kontinuierlich JPEG-kodierte Frames aus dem Livestream liefert.
-    """
-    global app_globals
-    frame_fail_count = 0
-
     while True:
-        if not app_globals.livestream_job or not app_globals.livestream_job.running:
-            print("[STREAM] Livestream job not running, exiting generator.")
-            break
+        frame = get_latest_frame()
+        if frame is None:
+            time.sleep(0.05)
+            continue
 
-        with app_globals.latest_frame_lock:
-            frame = app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
+        ret, buffer = cv2.imencode(".jpg", frame)
+        if not ret:
+            continue
 
-            if frame is None:
-                time.sleep(0.1)
-                frame_fail_count += 1
-                if frame_fail_count > 100:
-                    print("[STREAM] No frames available after multiple attempts, aborting stream.")
-                    break
-                continue
+        yield (
+            b"--frame\r\n"
+            b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
+        )
+        time.sleep(0.05)
 
-            frame_fail_count = 0
-            ret, buffer = cv2.imencode(".jpg", frame)
-            if not ret:
-                print("[STREAM] Frame encoding failed.")
-                continue
-
-            yield (
-                b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n\r\n" +
-                buffer.tobytes() +
-                b"\r\n"
-            )
-            time.sleep(0.03)
 
 def get_latest_frame():
     with app_globals.latest_frame_lock:
@@ -653,7 +633,6 @@ def resume_livestream():
             print("[PHOTO] Failed to restart livestream.")
 
     finally:
-        print("[PHOTO] Releasing livestream_resume_lock")
         app_globals.livestream_resume_lock.release()
 
 
