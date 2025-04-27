@@ -180,7 +180,7 @@ def force_restart_livestream():
 
         settings = get_camera_settings()
         apply_cv_settings(cap, settings, mode="video")
-
+        from cameraapp.livestream_job import LiveStreamJob
         livestream_job = LiveStreamJob(
             camera_source=0,
             frame_callback=lambda f: setattr(globals(), 'latest_frame', f.copy()),
