@@ -425,138 +425,110 @@ def media_browser(request):
     ]
     return render(request, "cameraapp/media_browser.html", {"media_tree": media_tree, "title": "Media Browser"})
 
-
 @require_POST
 @login_required
 def update_camera_settings(request):
-    global camera_instance
-    global livestream_job 
-    if not camera_instance or not camera_instance.isOpened():
-        print("[UPDATE_CAMERA_SETTINGS] Fallback: Camera still not open. Forcing restart...")
-        force_restart_livestream()
+    global camera_instance, livestream_job
+
     try:
         settings_obj = get_camera_settings_safe(connection)
-        if settings_obj:
-            print("[UPDATE_CAMERA_SETTINGS] Request received:", dict(request.POST))
-
-            for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-                value = request.POST.get(f"video_{param}")
-                if value is not None:
-                    try:
-                        setattr(settings_obj, f"video_{param}", float(value))
-                        print(f"[UPDATE_CAMERA_SETTINGS] Set video_{param} = {value}")
-                    except ValueError:
-                        print(f"[UPDATE_CAMERA_SETTINGS] Invalid value for {param}: {value}")
-
-            exposure_mode = request.POST.get("video_exposure_mode")
-            if exposure_mode in ["auto", "manual"]:
-                settings_obj.video_exposure_mode = exposure_mode
-                print(f"[UPDATE_CAMERA_SETTINGS] Set video_exposure_mode = {exposure_mode}")
-
-            settings_obj.save()
-            print("[UPDATE_CAMERA_SETTINGS] Settings saved.")
-
-        else:
+        if not settings_obj:
             print("[UPDATE_CAMERA_SETTINGS] No CameraSettings object found.")
             return HttpResponseRedirect(reverse("stream_page"))
 
+        print("[UPDATE_CAMERA_SETTINGS] Request received:", dict(request.POST))
+
+        for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+            value = request.POST.get(f"video_{param}")
+            if value is not None:
+                try:
+                    setattr(settings_obj, f"video_{param}", float(value))
+                    print(f"[UPDATE_CAMERA_SETTINGS] Set video_{param} = {value}")
+                except ValueError:
+                    print(f"[UPDATE_CAMERA_SETTINGS] Invalid value for {param}: {value}")
+
+        exposure_mode = request.POST.get("video_exposure_mode")
+        if exposure_mode in ["auto", "manual"]:
+            settings_obj.video_exposure_mode = exposure_mode
+            print(f"[UPDATE_CAMERA_SETTINGS] Set video_exposure_mode = {exposure_mode}")
+
+        settings_obj.save()
+        print("[UPDATE_CAMERA_SETTINGS] Settings saved.")
+
     except Exception as e:
-        print(f"[UPDATE_CAMERA_SETTINGS] Error saving settings: {e}")
+        print(f"[UPDATE_CAMERA_SETTINGS] Error during settings update: {e}")
         return HttpResponseRedirect(reverse("stream_page"))
 
     if not livestream_job:
-        return
+        print("[UPDATE_CAMERA_SETTINGS] No livestream_job active.")
+        return HttpResponseRedirect(reverse("stream_page"))
 
     with camera_lock:
-        livestream_job.stop()
-        livestream_job.join(timeout=2.0)
+        try:
+            livestream_job.stop()
+            livestream_job.join(timeout=2.0)
+            print("[UPDATE_CAMERA_SETTINGS] Livestream stopped.")
 
-        if camera_instance and camera_instance.isOpened():
-            camera_instance.release()
-            print("[UPDATE_CAMERA_SETTINGS] Released camera.")
+            if camera_instance and camera_instance.isOpened():
+                camera_instance.release()
+                print("[UPDATE_CAMERA_SETTINGS] Camera released.")
 
-        new_cap = try_open_camera(CAMERA_URL)
-        if new_cap and new_cap.isOpened():
+            new_cap = try_open_camera(CAMERA_URL)
+            if not new_cap or not new_cap.isOpened():
+                print("[UPDATE_CAMERA_SETTINGS] Failed to reopen camera.")
+                camera_instance = None
+                livestream_job = None
+                return HttpResponseRedirect(reverse("stream_page"))
+
             camera_instance = new_cap
             apply_cv_settings(camera_instance, settings_obj, mode="video")
             print("[UPDATE_CAMERA_SETTINGS] Camera reconfigured.")
-        else:
-            print("[UPDATE_CAMERA_SETTINGS] Failed to reopen camera.")
 
-        livestream_job = get_livestream_job(
-            camera_source=CAMERA_URL,
-            frame_callback=lambda f: update_latest_frame(f),
-            shared_capture=camera_instance
-        )
-        globals()["livestream_job"] = livestream_job
-        livestream_job.start()
-        print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
+            livestream_job = get_livestream_job(
+                camera_source=CAMERA_URL,
+                frame_callback=lambda f: update_latest_frame(f),
+                shared_capture=camera_instance
+            )
+            globals()["livestream_job"] = livestream_job
+            livestream_job.start()
+            print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
+
+        except Exception as e:
+            print(f"[UPDATE_CAMERA_SETTINGS] Error restarting livestream: {e}")
 
     return HttpResponseRedirect(reverse("stream_page"))
+
 
 
 @require_POST
 @login_required
-def update_camera_settings(request):
-    global camera_instance
-    global livestream_job 
-
+def update_photo_settings(request):
     try:
         settings_obj = get_camera_settings_safe(connection)
-        if settings_obj:
-            print("[UPDATE_CAMERA_SETTINGS] Request received:", dict(request.POST))
+        if not settings_obj:
+            print("[UPDATE_PHOTO_SETTINGS] No CameraSettings object found.")
+            return HttpResponseRedirect(reverse("photo_settings_page"))
 
-            for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-                value = request.POST.get(f"video_{param}")
-                if value is not None:
-                    try:
-                        setattr(settings_obj, f"video_{param}", float(value))
-                        print(f"[UPDATE_CAMERA_SETTINGS] Set video_{param} = {value}")
-                    except ValueError:
-                        print(f"[UPDATE_CAMERA_SETTINGS] Invalid value for {param}: {value}")
+        for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
+            value = request.POST.get(f"photo_{param}")
+            if value is not None:
+                try:
+                    setattr(settings_obj, f"photo_{param}", float(value))
+                except ValueError:
+                    print(f"[UPDATE_PHOTO_SETTINGS] Invalid value for {param}: {value}")
+                    continue
 
-            exposure_mode = request.POST.get("video_exposure_mode")
-            if exposure_mode in ["auto", "manual"]:
-                settings_obj.video_exposure_mode = exposure_mode
-                print(f"[UPDATE_CAMERA_SETTINGS] Set video_exposure_mode = {exposure_mode}")
+        exposure_mode = request.POST.get("photo_exposure_mode")
+        if exposure_mode in ["auto", "manual"]:
+            settings_obj.photo_exposure_mode = exposure_mode
 
-            settings_obj.save()
-            print("[UPDATE_CAMERA_SETTINGS] Settings saved.")
-        else:
-            print("[UPDATE_CAMERA_SETTINGS] No CameraSettings object found.")
-            return HttpResponseRedirect(reverse("stream_page"))
+        settings_obj.save()
+        print("[UPDATE_PHOTO_SETTINGS] Photo settings saved.")
 
     except Exception as e:
-        print(f"[UPDATE_CAMERA_SETTINGS] Error saving settings: {e}")
-        return HttpResponseRedirect(reverse("stream_page"))
+        print(f"[UPDATE_PHOTO_SETTINGS] Error while saving photo settings: {e}")
 
-    # Livestream sauber neustarten
-    with camera_lock:
-        if livestream_job:
-            livestream_job.stop()
-            livestream_job.join(timeout=2.0)
-            livestream_job = None
-            globals()["livestream_job"] = None
-            print("[UPDATE_CAMERA_SETTINGS] Livestream gestoppt.")
-
-        if camera_instance and camera_instance.isOpened():
-            camera_instance.release()
-            print("[UPDATE_CAMERA_SETTINGS] Released camera.")
-        camera_instance = None
-
-        time.sleep(0.5)  # wichtig, damit OS die Kamera wirklich freigibt
-
-        livestream_job = get_livestream_job(
-            camera_source=CAMERA_URL,
-            frame_callback=lambda f: update_latest_frame(f),
-            shared_capture=None  # sehr wichtig: NICHT direkt öffnen!
-        )
-        globals()["livestream_job"] = livestream_job
-        livestream_job.start()
-        print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
-
-    return HttpResponseRedirect(reverse("stream_page"))
-
+    return HttpResponseRedirect(reverse("photo_settings_page"))
 
 
 
