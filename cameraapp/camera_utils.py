@@ -98,7 +98,7 @@ def try_open_camera_safe(source):
     return try_open_camera(source)
 
 
-def safe_restart_camera_stream(frame_callback):
+def safe_restart_camera_stream(frame_callback, camera_source=None):
     """
     Restart the livestream job using the *single* CameraManager instance.
     Returns the new LiveStreamJob, or None on failure.
@@ -117,12 +117,17 @@ def safe_restart_camera_stream(frame_callback):
             livestream_job = None
 
         # 2) Ensure camera is alive (reopen if needed)
-        if not camera or not camera.is_available():
-            logger.info("Camera not available, attempting restart")
-            if not camera or not camera.restart():
-                logger.error("CameraManager restart failed")
+        if camera_source and (not camera or not camera.is_available()):
+            logger.info(f"CameraManager is being reinitialized with source: {camera_source}")
+            try:
+                camera = CameraManager(source=camera_source)
+                if not camera.is_available():
+                    logger.error("Newly initialized CameraManager is not available")
+                    return None
+            except Exception as e:
+                logger.error(f"Failed to reinitialize CameraManager: {e}")
                 return None
-            time.sleep(0.5)
+
 
         # 3) Re-apply user settings
         settings = get_camera_settings()
