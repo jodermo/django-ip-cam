@@ -7,8 +7,7 @@ import threading
 import glob
 from cameraapp.models import CameraSettings
 from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe, camera, update_livestream_job
-from .globals import camera_lock, camera_capture
-# camera_instance.py
+from .globals import camera_lock
 from .camera_manager import CameraManager
 
 
@@ -25,7 +24,6 @@ else:
     CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
 
-camera_instance = None 
 
 camera = None 
 
@@ -86,36 +84,6 @@ def reset_to_default():
 
 
 
-
-def apply_camera_settings(cap, brightness=None, contrast=None):
-    if cap and cap.isOpened():
-        if brightness is not None:
-            cap.set(cv2.CAP_PROP_BRIGHTNESS, brightness)
-        if contrast is not None:
-            cap.set(cv2.CAP_PROP_CONTRAST, contrast)
-
-def apply_video_settings(cap):
-    from cameraapp.models import CameraSettings
-    settings = CameraSettings.objects.first()
-    if not cap or not settings or not cap.isOpened():
-        return
-
-    if settings.video_exposure_mode == "auto":
-        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
-        time.sleep(0.5)
-    else:
-        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
-        time.sleep(0.5)
-
-
-    for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
-        value = getattr(settings, f"video_{param}", -1)
-        if value >= 0:
-            ok = cap.set(getattr(cv2, f"CAP_PROP_{param.upper()}"), value)
-            actual = cap.get(getattr(cv2, f"CAP_PROP_{param.upper()}"))
-            print(f"[VIDEO] Set {param} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
-
-
 def apply_auto_settings(settings, mode="photo"):
     if mode == "photo":
         settings.photo_exposure_mode = "auto"
@@ -139,12 +107,6 @@ def apply_auto_settings(settings, mode="photo"):
     print(f"[CAMERA_CORE] Auto {mode} settings applied.")
 
 
-def get_shared_camera():
-    global camera_capture
-    with camera_lock:
-        if camera_capture is None or not camera_capture.isOpened():
-            camera_capture = cv2.VideoCapture(0)
-        return camera_capture
 
 
 def auto_adjust_from_frame(frame, settings):
@@ -175,19 +137,4 @@ def auto_adjust_from_frame(frame, settings):
 def set_cv_param(cap, prop, value):
     if value is not None and value >= 0:
         cap.set(prop, value)
-
-def apply_photo_settings(camera, settings):
-    set_cv_param(camera, cv2.CAP_PROP_BRIGHTNESS, settings.photo_brightness)
-    set_cv_param(camera, cv2.CAP_PROP_CONTRAST, settings.photo_contrast)
-    set_cv_param(camera, cv2.CAP_PROP_SATURATION, settings.photo_saturation)
-    set_cv_param(camera, cv2.CAP_PROP_EXPOSURE, settings.photo_exposure)
-    set_cv_param(camera, cv2.CAP_PROP_GAIN, settings.photo_gain)
-    if getattr(settings, "photo_exposure_mode", "manual") == "auto":
-        camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
-    else:
-        camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
-
-def enable_auto_exposure(cap):
-    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
-    time.sleep(0.5)
 

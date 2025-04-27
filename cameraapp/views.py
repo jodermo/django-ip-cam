@@ -27,15 +27,14 @@ from django.contrib.auth import logout
 from .models import CameraSettings
 from .camera_core import (
     init_camera, reset_to_default,
-    apply_photo_settings, apply_auto_settings, auto_adjust_from_frame, try_open_camera_safe,
-    try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream, get_camera_settings_safe,
-    release_and_reset_camera, camera, LiveStreamJob, update_livestream_job
+    apply_auto_settings, auto_adjust_from_frame,
+    apply_cv_settings, get_camera_settings, get_camera_settings_safe,
+    release_and_reset_camera, camera, LiveStreamJob
 )
 from .camera_utils import safe_restart_camera_stream
 from .globals import (
     camera_lock, latest_frame, latest_frame_lock,
     livestream_resume_lock, livestream_job, taking_foto,
-    camera_instance, camera_capture,
     active_stream_viewers, last_disconnect_time, recording_timeout,
     recording_job,
 )
@@ -59,9 +58,14 @@ os.makedirs(PHOTO_DIR, exist_ok=True)
 
 def get_livestream_job(camera_source, frame_callback=None, shared_capture=None):
     global livestream_job, camera
-    livestream_job = LiveStreamJob(camera_source, frame_callback, shared_capture or camera)
+    livestream_job = LiveStreamJob(
+        camera_source=camera_source,
+        frame_callback=frame_callback,
+        shared_capture=shared_capture or (camera.cap if camera else None)
+    )
     globals()["livestream_job"] = livestream_job
     return livestream_job
+
 
 
 def update_latest_frame(frame):
@@ -69,12 +73,6 @@ def update_latest_frame(frame):
     with latest_frame_lock:
         latest_frame = frame.copy()
 
-livestream_job = get_livestream_job(
-    camera_source=CAMERA_URL,
-    frame_callback=lambda f: update_latest_frame(f),
-    shared_capture=camera.cap if camera else None
-)
-globals()["livestream_job"] = livestream_job
 
 def logout_view(request):
     logout(request)
@@ -146,7 +144,7 @@ def generate_frames():
 @login_required
 def video_feed(request):
     global camera
-    frame = camera.get_frame()
+    frame = camera.get_frame() if camera else None
     if frame is None:
         print("[VIDEO_FEED] No frame available. Returning 503.")
         return HttpResponse("No frame", status=503)
@@ -157,22 +155,6 @@ def video_feed(request):
         content_type="multipart/x-mixed-replace; boundary=frame"
     )
 
-
-
-
-def apply_video_settings(cap):
-    settings = CameraSettings.objects.first()
-    if not cap or not cap.isOpened() or not settings:
-        return
-
-    cap.set(cv2.CAP_PROP_BRIGHTNESS, settings.video_brightness)
-    cap.set(cv2.CAP_PROP_CONTRAST, settings.video_contrast)
-    cap.set(cv2.CAP_PROP_SATURATION, settings.video_saturation)
-    cap.set(cv2.CAP_PROP_EXPOSURE, settings.video_exposure)
-    cap.set(cv2.CAP_PROP_GAIN, settings.video_gain)
-
-    # Optionally log actual values
-    print("[VIDEO] Set brightness =", settings.video_brightness, "→ actual =", cap.get(cv2.CAP_PROP_BRIGHTNESS))
 
 @login_required
 def stream_page(request):
@@ -200,7 +182,7 @@ def stream_page(request):
     livestream_job = get_livestream_job(
         camera_source=CAMERA_URL,
         frame_callback=lambda f: update_latest_frame(f),
-        shared_capture=camera_instance
+        shared_capture=camera.cap if camera else None
     )
     globals()["livestream_job"] = livestream_job
     if livestream_job and not livestream_job.running:
@@ -434,7 +416,7 @@ def media_browser(request):
 @require_POST
 @login_required
 def reset_camera_settings(request):
-    global camera_instance, livestream_job
+    global livestream_job
 
     try:
         settings_obj = get_camera_settings_safe(connection)
@@ -469,7 +451,6 @@ def reset_camera_settings(request):
             print("[RESET_CAMERA_SETTINGS] Livestream gestoppt.")
 
             release_and_reset_camera()
-            camera_instance = None  # <<< wichtig
             print("[RESET_CAMERA_SETTINGS] Kamera freigegeben.")
 
             livestream_job = safe_restart_camera_stream(
@@ -495,7 +476,7 @@ def reset_camera_settings(request):
 @require_POST
 @login_required
 def update_camera_settings(request):
-    global camera_instance, livestream_job
+    global livestream_job
 
     try:
         settings_obj = get_camera_settings_safe(connection)
@@ -542,7 +523,6 @@ def update_camera_settings(request):
             print("[UPDATE_CAMERA_SETTINGS] Livestream stopped.")
 
             release_and_reset_camera()
-            camera_instance = None  # <<< wichtig
             print("[RELEASE] Camera released.")
 
             print("[DEBUG] Calling safe_restart_camera_stream...")
@@ -671,13 +651,11 @@ def auto_photo_adjust(request):
         auto_adjust_from_frame(frame, settings)
         return JsonResponse({"status": "adjusted from live frame"})
 
-    # Fallback: temporäres Foto machen
     print("[AUTO-ADJUST] No live frame, capturing temp image.")
     if not camera or not camera.cap or not camera.cap.isOpened():
         return JsonResponse({"status": "camera not available"}, status=500)
 
-    apply_cv_settings(camera.cap, settings, mode="video")
-    time.sleep(0.3)
+    apply_cv_settings(camera, settings, mode="video")
     ret, temp_frame = camera.cap.read()
     time.sleep(0.3)
 
@@ -686,6 +664,7 @@ def auto_photo_adjust(request):
 
     auto_adjust_from_frame(temp_frame, settings)
     return JsonResponse({"status": "adjusted from temp photo"})
+
 
 @csrf_exempt
 @login_required
@@ -700,28 +679,28 @@ def photo_settings_page(request):
 @login_required
 @require_POST
 def manual_restart_camera(request):
-    from .camera_utils import safe_restart_camera_stream
-    from .globals import livestream_job
+    global livestream_job
 
     livestream_job = safe_restart_camera_stream(
         livestream_job_ref=livestream_job,
         camera_url=CAMERA_URL,
         frame_callback=lambda f: update_latest_frame(f),
-        retries=5,
+        retries=3,
         delay=2.0
     )
 
     globals()["livestream_job"] = livestream_job
-
     return redirect("stream_page")
 
 
 def wait_until_camera_available(device_index=0, max_attempts=5, delay=1.0):
     for attempt in range(max_attempts):
-        if camera and camera.cap and camera.cap.isOpened():
+        if camera and camera.is_available():
             print(f"[CAMERA_UTIL] CameraManager reports device available.")
             return True
         print(f"[CAMERA_UTIL] Waiting for camera... attempt {attempt+1}/{max_attempts}")
         time.sleep(delay)
     print(f"[CAMERA_UTIL] Camera not available after {max_attempts} attempts.")
     return False
+
+

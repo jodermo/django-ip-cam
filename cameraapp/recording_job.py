@@ -12,7 +12,6 @@ from .globals import camera
 
 logger = logging.getLogger(__name__)
 
-
 def safe_restart_livestream():
     """
     Stop any running livestream and restart it using the shared camera manager.
@@ -27,17 +26,18 @@ def safe_restart_livestream():
 
     time.sleep(1.0)
 
-    if not camera or not camera.cap or not camera.cap.isOpened():
+    if not camera or not camera.is_available():
         logger.error("[RECORDING] Camera not ready for livestream restart")
         return
 
     settings = get_camera_settings()
     if settings:
         try:
-            apply_cv_settings(camera.cap, settings, mode="video")
+            apply_cv_settings(camera, settings, mode="video")
         except Exception as e:
             logger.warning(f"[RECORDING] Failed to apply settings: {e}")
 
+    # Restart the livestream job
     job = LiveStreamJob(
         camera_source=0,
         frame_callback=lambda f: setattr(app_globals, 'latest_frame', f.copy()),

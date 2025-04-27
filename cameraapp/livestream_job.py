@@ -2,10 +2,16 @@ import threading
 import time
 import logging
 from typing import Callable, Optional, Union, Any
-from .camera_utils import apply_cv_settings, get_camera_settings, force_device_reset
+
 from .globals import livestream_lock, camera
 
 logger = logging.getLogger(__name__)
+
+
+def lazy_imports():
+    global apply_cv_settings, get_camera_settings, force_device_reset
+    from .camera_utils import apply_cv_settings, get_camera_settings, force_device_reset
+
 
 class LiveStreamJob:
     """
@@ -66,6 +72,7 @@ class LiveStreamJob:
             logger.info("LiveStreamJob thread joined")
 
     def _run(self) -> None:
+        lazy_imports()
         self.capture = self._connect_with_retries()
         if not self.capture:
             self.running = False
@@ -102,10 +109,11 @@ class LiveStreamJob:
         logger.info("LiveStreamJob capture loop exited")
 
     def _connect_with_retries(self):
+        lazy_imports()
         delay = self.base_delay
         for attempt in range(1, self.max_retries + 1):
             logger.info(f"Attempt {attempt} to connect to camera")
-            if camera and camera.cap and camera.cap.isOpened():
+            if self.is_camera_ready():
                 settings = get_camera_settings()
                 if settings:
                     try:
@@ -121,12 +129,16 @@ class LiveStreamJob:
 
         logger.error("Exceeded maximum retry attempts. Trying forced reset.")
         try:
-            force_device_reset("/dev/video0")
+            device_path = str(self.camera_source) if isinstance(self.camera_source, str) else "/dev/video0"
+            force_device_reset(device_path)
             time.sleep(3)
         except Exception as e:
             logger.error(f"force_device_reset failed: {e}")
 
-        return camera.cap if camera and camera.cap and camera.cap.isOpened() else None
+        if self.is_camera_ready():
+            return camera.cap
+        return None
+
 
     def _cleanup(self) -> None:
         if self.capture and not self.shared_capture:
@@ -140,3 +152,7 @@ class LiveStreamJob:
     def get_frame(self) -> Optional[Any]:
         with livestream_lock:
             return self.latest_frame.copy() if self.latest_frame is not None else None
+        
+    def is_camera_ready(self) -> bool:
+        return hasattr(camera, "cap") and camera.cap and camera.cap.isOpened()
+

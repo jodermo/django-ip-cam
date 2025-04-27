@@ -5,12 +5,17 @@ from datetime import datetime
 import numpy as np
 from django.conf import settings
 from django.db import connections
+import logging
 
 from .camera_utils import apply_cv_settings, get_camera_settings, force_restart_livestream
 from .globals import latest_frame_lock, latest_frame, livestream_job, camera_lock, camera
 
+# Set up logging
+logger = logging.getLogger(__name__)
+
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
+
 
 def take_photo():
     """
@@ -25,42 +30,42 @@ def take_photo():
             if latest_frame is not None:
                 frame = latest_frame.copy()
                 if cv2.imwrite(filepath, frame):
-                    print(f"[PHOTO] Saved from stream: {filepath}")
+                    logger.info(f"[PHOTO] Saved from stream: {filepath}")
                     return filepath
                 else:
-                    print("[PHOTO] Failed to save frame from stream.")
+                    logger.error("[PHOTO] Failed to save frame from stream.")
                     return None
             else:
-                print("[PHOTO] No frame available from stream.")
+                logger.warning("[PHOTO] No frame available from stream.")
 
-    print("[PHOTO] Livestream not available. Trying fallback using CameraManager...")
+    logger.info("[PHOTO] Livestream not available. Trying fallback using CameraManager...")
 
     with camera_lock:
-        if not camera or not camera.cap or not camera.cap.isOpened():
-            print("[PHOTO] CameraManager not ready or no available capture.")
+        if not camera or not camera.is_available():
+            logger.warning("[PHOTO] CameraManager not ready or unavailable.")
             return None
 
         settings = get_camera_settings()
         if settings:
-            apply_cv_settings(camera.cap, settings, mode="photo")
+            apply_cv_settings(camera, settings, mode="photo")
 
-        time.sleep(0.3)
-        ret, frame = camera.cap.read()
-        time.sleep(0.3)
+        # Capture frame using CameraManager
+        frame = camera.get_frame()
 
-        if not ret or frame is None:
-            print("[PHOTO] Failed to capture frame from fallback.")
+        if frame is None:
+            logger.error("[PHOTO] Failed to capture frame from fallback.")
             return None
 
         if cv2.imwrite(filepath, frame):
-            print(f"[PHOTO] Saved from fallback capture: {filepath}")
+            logger.info(f"[PHOTO] Saved from fallback capture: {filepath}")
         else:
-            print("[PHOTO] Failed to write fallback photo.")
+            logger.error("[PHOTO] Failed to write fallback photo.")
             return None
 
-    print("[PHOTO] Restarting livestream after fallback...")
+    logger.info("[PHOTO] Restarting livestream after fallback...")
     force_restart_livestream()
     return filepath
+
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
     """
@@ -74,27 +79,28 @@ def wait_for_table(table_name, db_alias="default", timeout=30):
             return
         except Exception:
             time.sleep(1)
-    print(f"[ERROR] Timeout: Table '{table_name}' not found after {timeout} seconds.")
+    logger.error(f"[ERROR] Timeout: Table '{table_name}' not found after {timeout} seconds.")
+
 
 def start_photo_scheduler():
     """
     Starts the periodic photo capture loop based on configured intervals.
     """
-    print("[SCHEDULER] Starting photo scheduler...")
+    logger.info("[SCHEDULER] Starting photo scheduler...")
     wait_for_table("cameraapp_camerasettings")
 
     while True:
         try:
             settings_obj = get_camera_settings()
             if settings_obj and settings_obj.timelapse_enabled:
-                print(f"[SCHEDULER] Timelapse active. Taking photo at {datetime.now()}")
+                logger.info(f"[SCHEDULER] Timelapse active. Taking photo at {datetime.now()}")
                 take_photo()
                 interval_min = settings_obj.photo_interval_min
             else:
                 interval_min = 15
-                print(f"[SCHEDULER] Timelapse disabled. Sleeping {interval_min} minutes.")
+                logger.info(f"[SCHEDULER] Timelapse disabled. Sleeping {interval_min} minutes.")
         except Exception as e:
-            print(f"[SCHEDULER] Error during scheduler cycle: {e}")
+            logger.error(f"[SCHEDULER] Error during scheduler cycle: {e}")
             interval_min = 5
 
         time.sleep(interval_min * 60)

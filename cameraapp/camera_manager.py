@@ -12,7 +12,7 @@ if globals().get("camera") is not None:
     print("[CameraManager] Warning: Existing camera instance found. Replacing it.")
     globals()["camera"].stop()
     globals()["camera"] = None
-    
+
 def cleanup_camera():
     if globals().get("camera"):
         globals()["camera"].stop()
@@ -111,6 +111,10 @@ class CameraManager:
 
             time.sleep(0.01)  # Minimaler Delay, entlastet CPU
 
+    def is_available(self):
+        with self.lock:
+            return self.cap is not None and self.cap.isOpened()
+
 
     def get_frame(self):
         with self.lock:
@@ -124,6 +128,8 @@ class CameraManager:
             self.cap = None
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=2)
+        globals()["camera"] = None
+
 
 
 
