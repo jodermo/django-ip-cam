@@ -117,7 +117,7 @@ def video_feed(request):
 
 
     with camera_lock:
-        if not livestream_job.running:
+        if not livestream_job and livestream_job.running:
             livestream_job.start()
 
     def stream_generator():

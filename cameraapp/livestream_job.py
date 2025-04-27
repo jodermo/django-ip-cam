@@ -88,3 +88,4 @@ class LiveStreamJob:
             if self.latest_frame is None:
                 print("[LIVE_STREAM_JOB] Keine Frames vorhanden.")
             return self.latest_frame.copy() if self.latest_frame is not None else None
+
