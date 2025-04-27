@@ -6,8 +6,8 @@ import time
 import threading
 import glob
 from cameraapp.models import CameraSettings
-from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe, camera, update_livestream_job
-from .globals import camera_lock
+from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe, update_livestream_job
+from .globals import camera_lock, camera
 from .camera_manager import CameraManager
 
 
