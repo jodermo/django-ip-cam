@@ -609,6 +609,7 @@ def pause_livestream():
 def resume_livestream():
     print("[PHOTO] resume_livestream")
     global app_globals
+
     if not app_globals.livestream_resume_lock.acquire(timeout=5):
         print("[PHOTO] Timeout acquiring livestream_resume_lock – skipping resume.")
         return
@@ -620,7 +621,7 @@ def resume_livestream():
             app_globals.livestream_job.stop()
             app_globals.livestream_job.join(timeout=2.0)
 
-        # Re-initialize camera if needed
+        # Kamera bei Bedarf reinitialisieren
         if not app_globals.camera or not app_globals.camera.is_available():
             print("[PHOTO] Reinitializing CameraManager...")
             try:
@@ -629,7 +630,18 @@ def resume_livestream():
                 print(f"[PHOTO] Failed to reinitialize CameraManager: {e}")
                 return
 
-        # Start livestream
+        # === Warten, bis cap wirklich offen ist ===
+        for attempt in range(6):
+            if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
+                print(f"[PHOTO] Camera ready for livestream on attempt {attempt + 1}")
+                break
+            print(f"[PHOTO] Waiting for camera reopen... attempt {attempt + 1}/6")
+            time.sleep(1.0)
+        else:
+            print("[PHOTO] Camera still not available. Aborting resume.")
+            return
+
+        # Livestream starten
         app_globals.livestream_job = safe_restart_camera_stream(
             frame_callback=update_latest_frame,
             camera_source=CAMERA_URL
@@ -639,15 +651,25 @@ def resume_livestream():
             print("[PHOTO] Livestream restarted successfully.")
         else:
             print("[PHOTO] Failed to restart livestream.")
+
     finally:
+        print("[PHOTO] Releasing livestream_resume_lock")
         app_globals.livestream_resume_lock.release()
+
+
+
+
 
 def resume_livestream_safe():
     try:
         print("[PHOTO] resume_livestream_safe: Thread started")
         resume_livestream()
+        print("[PHOTO] resume_livestream_safe: Stream resumed successfully")
     except Exception as e:
         print(f"[PHOTO] resume_livestream_safe: ERROR: {e}")
+        # Optional: hier Fehlerstatus in globalem Flag setzen, z. B. für Anzeige im UI
+        # app_globals.last_resume_error = str(e)
+
 
 @csrf_exempt
 @require_POST
@@ -655,32 +677,44 @@ def resume_livestream_safe():
 def take_photo_now(request):
     global app_globals
     photo_path = None
+
     print("[PHOTO] take_photo_now")
+
     try:
-        with app_globals.camera_lock:
-            pause_livestream()
+        pause_livestream()
 
-            for attempt in range(6):
-                if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
-                    print(f"[PHOTO] Camera ready on attempt {attempt + 1}")
-                    break
-                print(f"[PHOTO] Waiting for camera... attempt {attempt + 1}/6")
-                time.sleep(1.0)
-            else:
-                print("[PHOTO] Camera not ready after retries.")
-                return JsonResponse({"status": "camera not ready after retries"}, status=500)
+        # === [1] Warten, bis Kamera bereit ist ===
+        for attempt in range(6):
+            if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
+                print(f"[PHOTO] Camera ready on attempt {attempt + 1}")
+                break
+            print(f"[PHOTO] Waiting for camera... attempt {attempt + 1}/6")
+            time.sleep(1.0)
+        else:
+            print("[PHOTO] Camera not ready after retries.")
+            return JsonResponse({"status": "camera not ready after retries"}, status=500)
 
-            photo_path = take_photo()
-            if not photo_path or not os.path.exists(photo_path):
-                return JsonResponse({"status": "photo capture failed"}, status=500)
+        # === [2] Foto machen (take_photo hat eigenen Lock) ===
+        photo_path = take_photo()
+
+        if not photo_path:
+            print("[PHOTO] take_photo() returned None")
+            return JsonResponse({"status": "photo capture failed"}, status=500)
+
+        if not os.path.exists(photo_path):
+            print(f"[PHOTO] File not found after capture: {photo_path}")
+            return JsonResponse({"status": "photo file missing"}, status=500)
+
+        print(f"[PHOTO] Photo taken and saved: {photo_path}")
+        return JsonResponse({"status": "ok", "file": photo_path})
+
+    except Exception as e:
+        print(f"[PHOTO] EXCEPTION during take_photo_now: {e}")
+        return JsonResponse({"status": "internal error", "error": str(e)}, status=500)
 
     finally:
-        # Logging + Exception safe
         print("[PHOTO] Spawning resume_livestream thread")
         threading.Thread(target=resume_livestream_safe, daemon=True).start()
-
-    return JsonResponse({"status": "ok", "file": photo_path})
-
 
 
 @csrf_exempt
