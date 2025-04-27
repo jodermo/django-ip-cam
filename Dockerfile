@@ -12,9 +12,10 @@
     # --- System dependencies (OpenCV + V4L2 support) ---
     RUN apt-get update && apt-get install -y \
     v4l-utils \
-    apt-get install -y lsof\
+    lsof \
     libglib2.0-0 libsm6 libxrender1 libxext6 libopencv-dev gcc \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+    
 
     # --- Install dependencies ---
     COPY requirements.txt .
