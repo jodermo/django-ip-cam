@@ -266,9 +266,10 @@
       headers: { 'X-CSRFToken': '{{ csrf_token }}' }
     }).then(res => res.json()).then(data => {
       alert(data.status || "Photo taken");
-      location.reload();
+      window.location.href = "/gallery/"; 
     });
   }
+
 
   function loadImage(src) {
     const img = new Image();
