@@ -499,7 +499,7 @@ def update_camera_settings(request):
                 retries=3,
                 delay=2.0
             )
-
+            print(f"[DEBUG] Restart result: livestream_job = {livestream_job}")
             if livestream_job:
                 globals()["livestream_job"] = livestream_job
                 print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")

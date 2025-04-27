@@ -119,7 +119,6 @@ def try_open_camera(camera_source, retries=3, delay=1.0):
     return None
 
 
-
 def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, retries: int = 3, delay: float = 2.0):
     """
     Safely restart the livestream:
@@ -132,7 +131,9 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
         LiveStreamJob or None on failure
     """
     from .livestream_job import LiveStreamJob
+    import gc
 
+    logger.info("[RESTART] Starting safe_restart_camera_stream...")
     with camera_lock:
         # 1) Stop existing livestream
         if livestream_job_ref and getattr(livestream_job_ref, 'running', False):
@@ -140,40 +141,58 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
             try:
                 livestream_job_ref.stop()
                 livestream_job_ref.join(timeout=2.0)
+                logger.info("[RESTART] Livestream job stopped.")
             except Exception as e:
                 logger.warning(f"[RESTART] Error stopping previous job: {e}")
 
-        # 2) Attempt to open camera
+        # 2) Garbage collect and delay to fully release camera resources
+        logger.info("[RESTART] Running gc.collect() and waiting for device release...")
+        gc.collect()
+        time.sleep(1.5)
+
+        # 3) Attempt to open camera with retries
+        logger.info(f"[RESTART] Trying to open camera ({camera_url}) with {retries} retries...")
         cap = try_open_camera(camera_url, retries=retries, delay=delay)
         if not cap or not cap.isOpened():
-            logger.error(f"[RESTART] Camera not available after {retries} attempts.")
+            logger.error("[RESTART] Camera not available after retries. Aborting restart.")
             return None
 
-        # 3) Apply settings if present
+        logger.info("[RESTART] Camera opened successfully.")
+
+        # 4) Apply stored camera settings
         settings = get_camera_settings()
         if settings:
             try:
                 apply_cv_settings(cap, settings, mode="video")
-                logger.debug("[RESTART] Camera settings applied.")
+                logger.info("[RESTART] Camera settings applied successfully.")
             except Exception as e:
-                logger.warning(f"[RESTART] Failed to apply settings: {e}")
+                logger.warning(f"[RESTART] Failed to apply camera settings: {e}")
         else:
-            logger.warning("[RESTART] No CameraSettings found; using defaults.")
+            logger.warning("[RESTART] No CameraSettings found – using defaults.")
 
-        # 4) Create and start new livestream job
+        # 5) Create and start new LiveStreamJob
         try:
+            logger.info("[RESTART] Creating new LiveStreamJob instance...")
             job = LiveStreamJob(
                 camera_source=camera_url,
                 frame_callback=frame_callback,
                 shared_capture=cap
             )
             job.start()
-            logger.info("[RESTART] Livestream job started successfully.")
+            time.sleep(0.5)
+
+            if not job.running:
+                logger.error("[RESTART] LiveStreamJob failed to start.")
+                cap.release()
+                return None
+
+            logger.info("[RESTART] LiveStreamJob started successfully.")
             return job
         except Exception as e:
             logger.error(f"[RESTART] Failed to start livestream job: {e}")
             cap.release()
             return None
+
 
 
 
