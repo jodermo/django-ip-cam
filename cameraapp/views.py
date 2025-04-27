@@ -1,14 +1,12 @@
-# default
+# cameraapp/views.py
+
 import os
 import cv2
 import time
 import threading
 import datetime
 import subprocess
-# views.py
 
-
-# Django
 from django.http import (
     StreamingHttpResponse, HttpResponseServerError, JsonResponse,
     HttpResponseRedirect
@@ -25,21 +23,19 @@ from django.apps import apps
 from django.db import connection
 from django.contrib.auth import logout
 
-# project
 from .models import CameraSettings
 from .camera_core import (
-    init_camera, camera_instance, reset_to_default, try_open_camera, get_camera_settings, apply_photo_settings,
-    apply_auto_settings, auto_adjust_from_frame, apply_cv_settings
+    init_camera, camera_instance, reset_to_default, apply_photo_settings,
+    apply_auto_settings, auto_adjust_from_frame
 )
 from .recording_job import RecordingJob
-
-
 from .scheduler import take_photo 
-from .globals import camera_lock, latest_frame, latest_frame_lock
+from .globals import camera_lock, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
+from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings, safe_restart_camera_stream
 
 from dotenv import load_dotenv
 load_dotenv()
-livestream_resume_lock = threading.Lock()
+
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
 CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
@@ -49,15 +45,6 @@ RECORD_DIR = os.path.join(settings.MEDIA_ROOT, "recordings")
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(RECORD_DIR, exist_ok=True)
 os.makedirs(PHOTO_DIR, exist_ok=True)
-
-# Globals
-active_stream_viewers = 0
-last_disconnect_time = None
-recording_job = None
-recording_timeout = 30
-
-livestream_job = None
-
 
 
 def get_livestream_job(camera_source, frame_callback=None, shared_capture=None):
@@ -168,7 +155,6 @@ def apply_video_settings(cap):
 
 @login_required
 def stream_page(request):
-    global livestream_job
 
     settings_obj = get_camera_settings_safe()
     camera_error = None
@@ -297,7 +283,6 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
 @require_POST
 @login_required
 def start_recording(request):
-    global recording_job
     if recording_job and recording_job.active:
         return JsonResponse({"status": "already recording"})
 
@@ -331,7 +316,6 @@ def start_recording(request):
 @require_POST
 @login_required
 def stop_recording(request):
-    global recording_job
     if recording_job and recording_job.active:
         recording_job.stop()
         return JsonResponse({"status": "stopping"})
@@ -342,7 +326,6 @@ def stop_recording(request):
 @csrf_exempt
 @login_required
 def is_recording(request):
-    global recording_job
     state = recording_job.active if recording_job else False
     return JsonResponse({"recording": state})
 

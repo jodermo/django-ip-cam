@@ -2,7 +2,13 @@
 
 import time
 import cv2
+import threading
 from django.apps import apps
+from .livestream_job import LiveStreamJob
+from . import globals
+
+camera_lock = threading.Lock()
+
 
 def get_camera_settings():
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
@@ -96,3 +102,22 @@ def try_open_camera(camera_source, retries=3, delay=1.0):
         time.sleep(delay)
     print("[DEBUG] All attempts failed. Returning None.")
     return None
+
+
+def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback):
+    with camera_lock:
+        if livestream_job_ref and livestream_job_ref.running:
+            livestream_job_ref.stop()
+            livestream_job_ref.join(timeout=2.0)
+
+        cap = try_open_camera(camera_url, retries=3, delay=2.0)
+        if not cap or not cap.isOpened():
+            print("[RESTART] Camera still not available.")
+            return None
+
+        settings = get_camera_settings()
+        apply_cv_settings(cap, settings, mode="video")
+
+        job = LiveStreamJob(camera_url, frame_callback=frame_callback, shared_capture=cap)
+        job.start()
+        return job

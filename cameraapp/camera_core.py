@@ -3,22 +3,16 @@ import cv2
 import time
 # camera_core.py
 import cv2
-import threading
-from django.apps import apps
-from .globals import camera_lock, latest_frame, latest_frame_lock
+
+from . import globals
 from cameraapp.models import CameraSettings
-from . import camera_core
-from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera
+from .camera_utils import camera_lock, get_camera_settings, apply_cv_settings, try_open_camera
 
 from dotenv import load_dotenv
 load_dotenv()
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
 CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
-
-camera_instance = None
-camera_capture = None
-camera_lock = threading.Lock()
 
 
 def init_camera():
@@ -216,24 +210,3 @@ def apply_photo_settings(camera, settings):
 def enable_auto_exposure(cap):
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
 
-
-
-def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback):
-    from .camera_core import try_open_camera, apply_cv_settings, get_camera_settings
-
-    with camera_lock:
-        if livestream_job_ref and livestream_job_ref.running:
-            livestream_job_ref.stop()
-            livestream_job_ref.join(timeout=2.0)
-
-        cap = try_open_camera(camera_url, retries=3, delay=2.0)
-        if not cap or not cap.isOpened():
-            print("[RESTART] Camera still not available.")
-            return None
-
-        settings = get_camera_settings()
-        apply_cv_settings(cap, settings, mode="video")
-
-        job = LiveStreamJob(camera_url, frame_callback=frame_callback, shared_capture=cap)
-        job.start()
-        return job

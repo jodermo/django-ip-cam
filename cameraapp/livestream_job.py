@@ -1,5 +1,8 @@
+# cameraapp/livestream_job.py
+
 import threading
 import time
+from .globals import camera_lock, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
 from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
 
 class LiveStreamJob:
