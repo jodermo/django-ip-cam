@@ -1,16 +1,17 @@
 # cameraapp/camera_utils.py
 import logging
 import time
-import threading
 import os
 import gc
-import subprocess
 import cv2
 
 from django.apps import apps
-from .globals import livestream_job, camera_lock, latest_frame, latest_frame_lock, camera
 from cameraapp.camera_manager import CameraManager
 from cameraapp.livestream_job import LiveStreamJob
+from . import globals as app_globals
+camera = app_globals.camera
+livestream_job = app_globals.livestream_job
+camera_lock = app_globals.camera_lock
 
 logger = logging.getLogger(__name__)
 
@@ -164,9 +165,6 @@ def force_restart_livestream():
     Alias for backward compatibility: restart the livestream with default parameters.
     """
     logger.info("force_restart_livestream called")
-    # Uses environment or existing globals to restart
-    from .globals import latest_frame_lock, latest_frame
-    from .globals import camera_lock, livestream_job
     return safe_restart_camera_stream(
         camera_source=os.getenv("CAMERA_URL", 0),
         frame_callback=lambda f: setattr(__import__('cameraapp.globals', fromlist=['']), 'latest_frame', f.copy())
