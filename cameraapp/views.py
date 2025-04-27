@@ -137,44 +137,44 @@ def video_feed(request):
     )
 
 
-
 @login_required
 def stream_page(request):
+    global livestream_job
 
     settings_obj = get_camera_settings_safe(connection)
     camera_error = None
 
-    if request.method == "POST":
-        # ... settings speichern ...
-        with camera_lock:
-            if livestream_job:
-                livestream_job.stop()
-            time.sleep(1.0)
+    if not camera or not camera.is_available():
+        print("[STREAM_PAGE] Camera is not available, initializing...")
+        init_camera()
 
-            if camera and camera.cap and camera.cap.isOpened():
-                release_and_reset_camera()
-                print("[RELEASE] Camera released via CameraManager.")
-
-            wait_until_camera_available()
-            init_camera()
-            with livestream_resume_lock:
-                if not livestream_job.running:
-                    livestream_job.start()
-
-
-    globals()["livestream_job"] = livestream_job
-    if livestream_job and not livestream_job.running:
+    if not livestream_job or not livestream_job.running:
+        print("[STREAM_PAGE] Livestream not active, starting...")
         with livestream_resume_lock:
-            if not livestream_job.running:
-                livestream_job.start()
+            livestream_job = safe_restart_camera_stream(
+                frame_callback=update_latest_frame,
+                camera_source=CAMERA_URL
+            )
+            if livestream_job:
+                globals()["livestream_job"] = livestream_job
+                print("[STREAM_PAGE] Livestream started successfully.")
+            else:
+                print("[STREAM_PAGE] Failed to start livestream.")
+                camera_error = "Kamera konnte nicht gestartet werden."
 
+    # Warte auf ersten Frame
     start_time = time.time()
     while time.time() - start_time < 5:
-        frame = livestream_job.get_frame()
-        if frame is not None:
-            update_latest_frame(frame)
-            break
+        if livestream_job and livestream_job.running:
+            frame = livestream_job.get_frame()
+            if frame is not None:
+                update_latest_frame(frame)
+                print("[STREAM_PAGE] First frame received.")
+                break
         time.sleep(0.2)
+    else:
+        print("[STREAM_PAGE] Timeout waiting for first frame.")
+        camera_error = "Kein Bildsignal von Kamera erhalten."
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
