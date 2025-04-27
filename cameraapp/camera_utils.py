@@ -96,13 +96,20 @@ def try_open_camera_safe(source):
     """Safe wrapper for try_open_camera; included for backward compatibility."""
     return try_open_camera(source)
 
-
-def safe_restart_camera_stream(frame_callback, camera_source=None):
+def safe_restart_camera_stream(frame_callback=None, camera_source=None):
     """
     Restart the livestream job using the *single* CameraManager instance.
     Returns the new LiveStreamJob, or None on failure.
     """
     global app_globals
+
+    # Fallback für frame_callback → aktualisiert globalen latest_frame
+    if frame_callback is None:
+        def frame_callback(frame):
+            with app_globals.latest_frame_lock:
+                app_globals.latest_frame = frame.copy()
+
+    # Debug zur Kamera
     if not app_globals.camera:
         logger.error("camera is None after initialization")
     elif not app_globals.camera.cap:
@@ -111,8 +118,10 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
         logger.error("CameraManager.cap is not opened")
     else:
         logger.info("CameraManager.cap is valid and opened")
+
+    # Kamera exklusiv sperren
     with app_globals.camera_lock:
-        # 1) Stop existing livestream
+        # 1) Vorherigen Stream stoppen
         if app_globals.livestream_job and app_globals.livestream_job.running:
             try:
                 app_globals.livestream_job.stop()
@@ -122,14 +131,12 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
                 logger.warning(f"Error stopping livestream_job: {e}")
             app_globals.livestream_job = None
 
-        # 2) Ensure camera is alive (reopen if needed)
+        # 2) Kamera ggf. reinitialisieren
         if camera_source and (not app_globals.camera or not app_globals.camera.is_available()):
             logger.info(f"CameraManager is being reinitialized with source: {camera_source}")
             try:
                 app_globals.camera = CameraManager(source=camera_source)
-
-
-                globals()["camera"] = app_globals.camera
+                globals()["camera"] = app_globals.camera  # Fallback
 
                 if not app_globals.camera.is_available():
                     logger.error("Newly initialized CameraManager is not available")
@@ -138,30 +145,28 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
                 logger.error(f"Failed to reinitialize CameraManager: {e}")
                 return None
 
-
-
-        # 3) Re-apply user settings
+        # 3) CV-Einstellungen neu anwenden
         settings = get_camera_settings()
         if settings:
             try:
-                from .camera_utils import apply_cv_settings
                 apply_cv_settings(app_globals.camera, settings, mode="video")
                 logger.info("Re-applied CV settings")
             except Exception as e:
                 logger.warning(f"Failed to apply camera settings: {e}")
 
-        # 4) Start a fresh LiveStreamJob on the shared capture
+        # 4) Neuen LiveStreamJob starten
         try:
             new_job = LiveStreamJob(
-                camera_source=None,        # unused when shared_capture is given
+                camera_source=None,  # wird ignoriert, da shared_capture gesetzt
                 frame_callback=frame_callback,
                 shared_capture=(app_globals.camera.cap if app_globals.camera else None)
             )
             new_job.start()
-
             time.sleep(0.5)
+
             if not new_job.running:
                 raise RuntimeError("Livestream job did not start")
+            
             app_globals.livestream_job = new_job
             logger.info("Livestream restarted successfully")
             return new_job
@@ -169,6 +174,7 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
         except Exception as e:
             logger.error(f"Failed to start new livestream: {e}")
             return None
+
 
 def force_restart_livestream():
     """
