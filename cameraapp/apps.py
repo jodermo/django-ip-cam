@@ -7,15 +7,11 @@ class CameraappConfig(AppConfig):
     name = 'cameraapp'
 
     def ready(self):
-        try:
-            import cameraapp.signals
-        except ImportError:
-            pass
+        if os.environ.get("RUN_MAIN") != "true":
+            # Nur Webserver, nicht bei 'migrate' etc.
+            return
+        if os.environ.get("RUN_TIMELAPSE") == "1":
+            from .scheduler import start_photo_scheduler
+            threading.Thread(target=start_photo_scheduler, daemon=True).start()
 
-        def start_safe():
-            from .scheduler import wait_for_table, start_photo_scheduler
-            wait_for_table("cameraapp_camerasettings")
-            if os.environ.get("RUN_SCHEDULER", "1") == "1":
-                start_photo_scheduler()
 
-        threading.Thread(target=start_safe, daemon=True).start()
