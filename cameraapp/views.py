@@ -492,6 +492,7 @@ def update_camera_settings(request):
                 time.sleep(2.5)  # Allow hardware to reset
 
             # Restart using robust helper
+            print("[DEBUG] Calling safe_restart_camera_stream...")
             livestream_job = safe_restart_camera_stream(
                 livestream_job_ref=livestream_job,
                 camera_url=CAMERA_URL,
@@ -499,7 +500,8 @@ def update_camera_settings(request):
                 retries=3,
                 delay=2.0
             )
-            print(f"[DEBUG] Restart result: livestream_job = {livestream_job}")
+            print(f"[DEBUG] Result from restart: {livestream_job}")
+
             if livestream_job:
                 globals()["livestream_job"] = livestream_job
                 print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
