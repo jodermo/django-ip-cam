@@ -27,7 +27,7 @@ from .models import CameraSettings
 from .camera_core import (
     init_camera, reset_to_default,
     apply_photo_settings, apply_auto_settings, auto_adjust_from_frame,
-    try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream
+    try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream, get_camera_settings_safe
 )
 from .camera_utils import safe_restart_camera_stream
 from .globals import (
@@ -81,15 +81,6 @@ def logout_view(request):
 def get_camera_settings():
     return CameraSettings.objects.first()
 
-
-def get_camera_settings_safe():
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1 FROM cameraapp_camerasettings LIMIT 1")
-    except Exception:
-        return None
-    CameraSettings = apps.get_model("cameraapp", "CameraSettings")
-    return CameraSettings.objects.first()
 
 
 
@@ -187,7 +178,7 @@ def apply_video_settings(cap):
 @login_required
 def stream_page(request):
 
-    settings_obj = get_camera_settings_safe()
+    settings_obj = get_camera_settings_safe(connection)
     camera_error = None
 
     if request.method == "POST":
@@ -368,7 +359,7 @@ def photo_gallery(request):
         for fname in sorted(os.listdir(PHOTO_DIR)):
             if fname.lower().endswith((".jpg", ".jpeg", ".png")):
                 photos.append(f"/media/photos/{fname}")
-    settings_obj = get_camera_settings_safe()  
+    settings_obj = get_camera_settings_safe(connection) 
     return render(request, "cameraapp/gallery.html", {
         "photos": photos,
         "interval": settings_obj.interval_ms if settings_obj else 3000,
@@ -442,7 +433,7 @@ def update_camera_settings(request):
     global livestream_job 
 
     try:
-        settings_obj = get_camera_settings_safe()
+        settings_obj = get_camera_settings_safe(connection)
         if settings_obj:
             print("[UPDATE_CAMERA_SETTINGS] Request received:", dict(request.POST))
 
@@ -507,7 +498,7 @@ def update_camera_settings(request):
 @login_required
 def update_photo_settings(request):
     try:
-        settings_obj = get_camera_settings_safe()
+        settings_obj = get_camera_settings_safe(connection)
         if not settings_obj:
             print("[UPDATE_PHOTO_SETTINGS] No CameraSettings object found.")
             return HttpResponseRedirect(reverse("photo_settings_page"))

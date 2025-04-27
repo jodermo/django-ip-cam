@@ -13,6 +13,16 @@ def get_camera_settings():
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
 
+def get_camera_settings_safe(connection):
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1 FROM cameraapp_camerasettings LIMIT 1")
+    except Exception:
+        return None
+    CameraSettings = apps.get_model("cameraapp", "CameraSettings")
+    return CameraSettings.objects.first()
+
+
 
 def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     if not settings:
