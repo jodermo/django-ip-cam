@@ -119,7 +119,9 @@ def generate_frames():
             )
             time.sleep(0.03)
 
-
+def get_latest_frame():
+    with app_globals.latest_frame_lock:
+        return app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
 
 @csrf_exempt
 def video_feed(request):
