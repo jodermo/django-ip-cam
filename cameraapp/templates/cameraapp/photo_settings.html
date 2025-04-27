@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>Foto-Einstellungen</h1>
+  <h1>Photo Settings</h1>
   <form method="post" action="{% url 'update_photo_settings' %}">
     {% csrf_token %}
 
@@ -26,11 +26,11 @@
 
     <label>Exposure Mode:
       <select name="photo_exposure_mode">
-        <option value="manual" {% if settings.photo_exposure_mode == 'manual' %}selected{% endif %}>Manuell</option>
+        <option value="manual" {% if settings.photo_exposure_mode == 'manual' %}selected{% endif %}>Manual</option>
         <option value="auto" {% if settings.photo_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
       </select>
     </label><br>
 
-    <button type="submit">Speichern</button>
+    <button type="submit">Save</button>
   </form>
 {% endblock %}

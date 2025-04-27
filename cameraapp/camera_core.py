@@ -42,10 +42,10 @@ def init_camera():
     with camera_lock:
         print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
 
-    if camera_instance:
-        print("[CAMERA_CORE] Releasing previous camera instance.")
-        camera_instance.release()
-        time.sleep(1.0)
+        if camera_instance:
+            print("[CAMERA_CORE] Releasing previous camera instance.")
+            camera_instance.release()
+            time.sleep(1.0)
 
         print(f"[CAMERA_CORE] Attempting to open camera from source: {CAMERA_URL}")
         camera_instance = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
@@ -79,6 +79,7 @@ def init_camera():
         except Exception as e:
             print(f"[CAMERA_CORE] Exception while applying settings: {e}")
 
+
 def reset_to_default():
     settings = CameraSettings.objects.first()
     if not settings:
@@ -110,36 +111,67 @@ def reset_to_default():
 
     threading.Thread(target=delayed_reinit).start()
 
+def reset_to_default():
+    settings = CameraSettings.objects.first()
+    if not settings:
+        print("[RESET] No CameraSettings found. Aborting.")
+        return
+
+    # Reset photo mode
+    settings.photo_exposure_mode = "auto"
+    settings.photo_brightness = -1
+    settings.photo_contrast = -1
+    settings.photo_saturation = -1
+    settings.photo_exposure = -1
+    settings.photo_gain = -1
+
+    # Reset video mode
+    settings.video_exposure_mode = "auto"
+    settings.video_brightness = -1
+    settings.video_contrast = -1
+    settings.video_saturation = -1
+    settings.video_exposure = -1
+    settings.video_gain = -1
+
+    settings.save()
+    print("[RESET] CameraSettings reset to default (auto mode, no values set).")
+
+    def delayed_reinit():
+        time.sleep(1.0)
+        init_camera()
+
+    threading.Thread(target=delayed_reinit).start()
+
+
 def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     if not settings:
-        print("[CAMERA_CORE] Keine Einstellungen übergeben.")
+        print("[CAMERA_CORE] No settings provided.")
         return
 
     if not cap or not cap.isOpened():
-        print("[CAMERA_CORE] Kamera nicht geöffnet. Versuche Neustart...")
+        print("[CAMERA_CORE] Camera not opened. Attempting restart...")
 
         if reopen_callback:
             new_cap = reopen_callback()
             if new_cap and new_cap.isOpened():
                 cap = new_cap
-                camera_instance = cap  # <--- DAS FEHLTE
-                print("[CAMERA_CORE] Kamera erfolgreich neu geöffnet.")
-
+                camera_instance = cap
+                print("[CAMERA_CORE] Camera reopened successfully.")
         else:
-            print("[CAMERA_CORE] Kein reopen_callback definiert – Abbruch.")
+            print("[CAMERA_CORE] No reopen_callback defined – aborting.")
             return
 
     prefix = "video_" if mode == "video" else "photo_"
 
-    # ---- Auto-Exposure setzen ----
+    # Set auto-exposure
     exposure_mode = getattr(settings, f"{prefix}exposure_mode", "manual")
     if exposure_mode == "auto":
-        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)  # Auto-Modus V4L2
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
         print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = AUTO")
     else:
-        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # Manuell-Modus V4L2
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
         print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = MANUAL")
-        time.sleep(0.1)  # manche Kameras brauchen das nach Umschaltung
+        time.sleep(0.1)  # some cameras require this pause after switching mode
 
     def apply_param(name, min_valid=-1.0, max_valid=100.0):
         try:
@@ -149,38 +181,37 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
             try:
                 value = float(raw)
             except (TypeError, ValueError):
-                print(f"[WARNING] Ungültiger Wert für {prefix}{name}: {raw}")
+                print(f"[WARNING] Invalid value for {prefix}{name}: {raw}")
                 return
-
         except (TypeError, ValueError):
-            print(f"[WARNING] Ungültiger Wert für {prefix}{name}")
+            print(f"[WARNING] Invalid value for {prefix}{name}")
             return
 
         if value < 0:
-            print(f"[CAMERA_CORE] {name} deaktiviert (value={value})")
+            print(f"[CAMERA_CORE] {name} disabled (value={value})")
             return
 
         cap_prop = getattr(cv2, f"CAP_PROP_{name.upper()}", None)
         if cap_prop is None:
-            print(f"[WARNING] Unbekannte OpenCV-Eigenschaft: {name}")
+            print(f"[WARNING] Unknown OpenCV property: {name}")
             return
 
         if not (min_valid <= value <= max_valid):
-            print(f"[WARNING] {name} außerhalb gültigem Bereich ({value}) – wird ignoriert.")
+            print(f"[WARNING] {name} out of valid range ({value}) – ignored.")
             return
 
         ok = cap.set(cap_prop, value)
         actual = cap.get(cap_prop)
         print(f"[CAMERA_CORE] {mode.upper()} Set {name} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
 
-    # Werte setzen
+    # Apply camera parameters
     apply_param("brightness", 0.0, 255.0)
     apply_param("contrast", 0.0, 255.0)
     apply_param("saturation", 0.0, 255.0)
     apply_param("gain", 0.0, 10.0)
 
     if exposure_mode == "manual":
-        # Für viele Kameras gültig: -1 bis -13 (kleiner = dunkler)
+        # For many cameras: valid range is -1 to -13 (lower = darker)
         apply_param("exposure", -13.0, -1.0)
 
 

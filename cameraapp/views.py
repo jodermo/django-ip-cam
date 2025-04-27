@@ -204,7 +204,6 @@ def stream_page(request):
     })
 
 
-
 @require_GET
 @login_required
 def record_video(request):
@@ -227,9 +226,9 @@ def record_video(request):
         def async_record():
             success = record_video_to_file(filepath, duration, fps, resolution, codec)
             if not success:
-                print(f"[RECORD_VIDEO] Aufnahme fehlgeschlagen: {filepath}")
+                print(f"[RECORD_VIDEO] Recording failed: {filepath}")
             else:
-                print(f"[RECORD_VIDEO] Video gespeichert: {filepath}")
+                print(f"[RECORD_VIDEO] Video saved: {filepath}")
 
         threading.Thread(target=async_record, daemon=True).start()
 
@@ -243,7 +242,7 @@ def record_video(request):
         })
 
     except Exception as e:
-        print(f"[RECORD_VIDEO] Fehler: {e}")
+        print(f"[RECORD_VIDEO] Error: {e}")
         return JsonResponse({"error": str(e)}, status=400)
 
 
@@ -253,28 +252,14 @@ def reset_camera_view(request):
     init_camera()
     return redirect("settings_page")  # oder wo du zurück willst
 
-
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
-    """
-    Nimmt ein Video mit aktuellen Live-Frames auf und speichert es als Datei.
-
-    Args:
-        filepath (str): Zielpfad der Videodatei
-        duration (int): Aufnahmedauer in Sekunden
-        fps (float): Bilder pro Sekunde
-        resolution (tuple): Zielauflösung (Breite, Höhe)
-        codec (str): Video-Codec (z. B. 'mp4v', 'XVID', 'MJPG')
-
-    Returns:
-        bool: True, wenn mindestens ein Frame erfolgreich gespeichert wurde
-    """
-    print(f"[RECORD_TO_FILE] Start recording to {filepath} (duration={duration}s, fps={fps}, resolution={resolution})")
+    print(f"[RECORD_TO_FILE] Starting recording to {filepath} (duration={duration}s, fps={fps}, resolution={resolution})")
 
     try:
         fourcc = cv2.VideoWriter_fourcc(*codec)
         out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
         if not out.isOpened():
-            print(f"[RECORD_TO_FILE] Fehler: Kann Datei {filepath} nicht öffnen.")
+            print(f"[RECORD_TO_FILE] Error: Cannot open file {filepath} for writing.")
             return False
 
         frame_count = 0
@@ -285,24 +270,32 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
                 frame = latest_frame.copy() if latest_frame is not None else None
 
             if frame is None:
+                print("[RECORD_TO_FILE] No frame available, retrying...")
                 time.sleep(0.05)
                 continue
 
-            resized_frame = cv2.resize(frame.copy(), resolution)
-            out.write(resized_frame)
-            frame_count += 1
+            try:
+                resized_frame = cv2.resize(frame.copy(), resolution)
+                out.write(resized_frame)
+                frame_count += 1
+                if frame_count % 10 == 0:
+                    print(f"[RECORD_TO_FILE] {frame_count} frames written...")
+            except Exception as frame_err:
+                print(f"[RECORD_TO_FILE] Frame write failed: {frame_err}")
+                break
 
-            time.sleep(1.0 / fps)  # Taktet exakt auf Ziel-FPS
+            time.sleep(1.0 / fps)
 
     except Exception as e:
-        print(f"[RECORD_TO_FILE] Ausnahme beim Schreiben: {e}")
+        print(f"[RECORD_TO_FILE] Exception during recording: {e}")
         return False
 
     finally:
         out.release()
-        print(f"[RECORD_TO_FILE] Aufzeichnung abgeschlossen: {frame_count} Frames gespeichert → {filepath}")
+        print(f"[RECORD_TO_FILE] Recording complete: {frame_count} frames saved → {filepath}")
 
     return frame_count > 0
+
 
 
 @csrf_exempt
@@ -441,7 +434,7 @@ def update_camera_settings(request):
     try:
         settings_obj = get_camera_settings_safe()
         if settings_obj:
-            print("[UPDATE_CAMERA_SETTINGS] Anfrage erhalten:", dict(request.POST))
+            print("[UPDATE_CAMERA_SETTINGS] Request received:", dict(request.POST))
 
             for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
                 value = request.POST.get(f"video_{param}")
@@ -450,7 +443,7 @@ def update_camera_settings(request):
                         setattr(settings_obj, f"video_{param}", float(value))
                         print(f"[UPDATE_CAMERA_SETTINGS] Set video_{param} = {value}")
                     except ValueError:
-                        print(f"[UPDATE_CAMERA_SETTINGS] Ungültiger Wert für {param}: {value}")
+                        print(f"[UPDATE_CAMERA_SETTINGS] Invalid value for {param}: {value}")
 
             exposure_mode = request.POST.get("video_exposure_mode")
             if exposure_mode in ["auto", "manual"]:
@@ -458,34 +451,34 @@ def update_camera_settings(request):
                 print(f"[UPDATE_CAMERA_SETTINGS] Set video_exposure_mode = {exposure_mode}")
 
             settings_obj.save()
-            print("[UPDATE_CAMERA_SETTINGS] Einstellungen gespeichert.")
+            print("[UPDATE_CAMERA_SETTINGS] Settings saved.")
 
         else:
-            print("[UPDATE_CAMERA_SETTINGS] Kein CameraSettings-Objekt vorhanden.")
+            print("[UPDATE_CAMERA_SETTINGS] No CameraSettings object found.")
             return HttpResponseRedirect(reverse("stream_page"))
 
     except Exception as e:
-        print(f"[UPDATE_CAMERA_SETTINGS] Fehler beim Speichern: {e}")
+        print(f"[UPDATE_CAMERA_SETTINGS] Error saving settings: {e}")
         return HttpResponseRedirect(reverse("stream_page"))
 
     if not livestream_job:
-            return
-    
+        return
+
     with camera_lock:
         livestream_job.stop()
         livestream_job.join(timeout=2.0)
 
         if camera_instance and camera_instance.isOpened():
             camera_instance.release()
-            print("[UPDATE_CAMERA_SETTINGS] Kamera freigegeben.")
+            print("[UPDATE_CAMERA_SETTINGS] Released camera.")
 
         new_cap = try_open_camera(CAMERA_URL)
         if new_cap and new_cap.isOpened():
             camera_instance = new_cap
             apply_cv_settings(camera_instance, settings_obj, mode="video")
-            print("[UPDATE_CAMERA_SETTINGS] Kamera neu konfiguriert.")
+            print("[UPDATE_CAMERA_SETTINGS] Camera reconfigured.")
         else:
-            print("[UPDATE_CAMERA_SETTINGS] Kamera konnte nicht erneut geöffnet werden.")
+            print("[UPDATE_CAMERA_SETTINGS] Failed to reopen camera.")
 
         livestream_job = get_livestream_job(
             camera_source=CAMERA_URL,
@@ -494,9 +487,10 @@ def update_camera_settings(request):
         )
         globals()["livestream_job"] = livestream_job
         livestream_job.start()
-        print("[UPDATE_CAMERA_SETTINGS] Livestream neu gestartet.")
+        print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
 
     return HttpResponseRedirect(reverse("stream_page"))
+
 
 
 @require_POST
@@ -505,7 +499,7 @@ def update_photo_settings(request):
     try:
         settings_obj = get_camera_settings_safe()
         if not settings_obj:
-            print("[UPDATE_PHOTO_SETTINGS] Kein CameraSettings-Objekt gefunden.")
+            print("[UPDATE_PHOTO_SETTINGS] No CameraSettings object found.")
             return HttpResponseRedirect(reverse("photo_settings_page"))
 
         for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
@@ -514,7 +508,7 @@ def update_photo_settings(request):
                 try:
                     setattr(settings_obj, f"photo_{param}", float(value))
                 except ValueError:
-                    print(f"[UPDATE_PHOTO_SETTINGS] Ungültiger Wert für {param}: {value}")
+                    print(f"[UPDATE_PHOTO_SETTINGS] Invalid value for {param}: {value}")
                     continue
 
         exposure_mode = request.POST.get("photo_exposure_mode")
@@ -522,24 +516,24 @@ def update_photo_settings(request):
             settings_obj.photo_exposure_mode = exposure_mode
 
         settings_obj.save()
-        print("[UPDATE_PHOTO_SETTINGS] Fotoeinstellungen gespeichert.")
+        print("[UPDATE_PHOTO_SETTINGS] Photo settings saved.")
 
     except Exception as e:
-        print(f"[UPDATE_PHOTO_SETTINGS] Fehler beim Speichern der Fotoeinstellungen: {e}")
+        print(f"[UPDATE_PHOTO_SETTINGS] Error while saving photo settings: {e}")
 
     return HttpResponseRedirect(reverse("photo_settings_page"))
-
 
 
 
 def pause_livestream():
     if livestream_job.running:
         livestream_job.stop()
-        print("[PHOTO] Livestream wurde pausiert für Fotoaufnahme.")
-        time.sleep(0.5)  # Kamera freigeben lassen
+        print("[PHOTO] Livestream was paused for photo capture.")
+        time.sleep(0.5)
+
 
 def resume_livestream():
-    print("[PHOTO] Warte auf Freigabe der Kamera...")
+    print("[PHOTO] Waiting for camera release...")
     time.sleep(1.5)
 
     if not livestream_job.running:
@@ -547,13 +541,13 @@ def resume_livestream():
             livestream_job.start()
             time.sleep(1.0)
             if livestream_job.running and livestream_job.get_frame() is not None:
-                print("[PHOTO] Livestream wurde wieder gestartet.")
+                print("[PHOTO] Livestream restarted successfully.")
                 return
-            print(f"[PHOTO] Livestream-Neustart fehlgeschlagen (Versuch {attempt + 1})")
+            print(f"[PHOTO] Livestream restart failed (attempt {attempt + 1})")
             livestream_job.stop()
             time.sleep(1.5)
 
-        print("[PHOTO] Livestream konnte nicht gestartet werden.")
+        print("[PHOTO] Livestream could not be restarted.")
 
 
 
@@ -565,7 +559,7 @@ def take_photo_now(request):
         try:
             success = take_photo()
             if not success:
-                return JsonResponse({"status": "Kamera konnte nicht geöffnet werden."}, status=500)
+                return JsonResponse({"status": "Camera could not be opened."}, status=500)
         finally:
             resume_livestream()
     return JsonResponse({"status": "ok"})
@@ -576,10 +570,11 @@ def take_photo_now(request):
 def auto_photo_settings(request):
     settings = CameraSettings.objects.first()
     if not settings:
-        return JsonResponse({"success": False, "message": "Keine Kameraeinstellungen gefunden."})
+        return JsonResponse({"success": False, "message": "No camera settings found."})
 
     apply_auto_settings(settings)
-    return JsonResponse({"success": True, "message": "Autoeinstellungen angewendet."})
+    return JsonResponse({"success": True, "message": "Auto settings applied."})
+
 
 @require_POST
 @login_required

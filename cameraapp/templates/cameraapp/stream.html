@@ -79,16 +79,16 @@
 
   <div class="overlay-controls">
     <p><strong>User:</strong> {{ request.user.username }}</p>
-    <p><strong>Zuschauer:</strong> {{ viewer_count }}</p>
+    <p><strong>Viewers:</strong> {{ viewer_count }}</p>
     <p><a href="{% url 'logout' %}" style="color: lightblue;">Logout</a></p>
 
     <button onclick="startRecording()">⏺ Start</button>
     <button onclick="stopRecording()">⏹ Stop</button>
-    <button onclick="autoAdjust()">🌞 Auto-Anpassen</button>
-    <button onclick="toggleSettings()">⚙️ Einstellungen</button>
+    <button onclick="autoAdjust()">🌞 Auto Adjust</button>
+    <button onclick="toggleSettings()">⚙️ Settings</button>
     <form method="post" action="{% url 'reset_camera' %}" style="display:inline;">
       {% csrf_token %}
-      <button type="submit">🔄 Reset</button>
+      <button type="submit">🔄 Reset Camera</button>
     </form>
     <p id="recordStatus" style="margin-top:0.5em;"></p>
   </div>
@@ -97,19 +97,19 @@
     <form method="POST" action="{% url 'update_camera_settings' %}">
       {% csrf_token %}
   
-      <label for="brightness">Helligkeit (0–255)</label>
+      <label for="brightness">Brightness (0–255)</label>
       <input type="range" id="brightness" name="video_brightness" min="0" max="255" step="1"
              value="{{ settings.video_brightness|default:128 }}">
   
-      <label for="contrast">Kontrast (0–255)</label>
+      <label for="contrast">Contrast (0–255)</label>
       <input type="range" id="contrast" name="video_contrast" min="0" max="255" step="1"
              value="{{ settings.video_contrast|default:128 }}">
   
-      <label for="saturation">Sättigung (0–255)</label>
+      <label for="saturation">Saturation (0–255)</label>
       <input type="range" id="saturation" name="video_saturation" min="0" max="255" step="1"
              value="{{ settings.video_saturation|default:128 }}">
   
-      <label for="exposure">Belichtung (-13 bis 0, nur bei manueller Belichtung)</label>
+      <label for="exposure">Exposure (-13 to 0, only for manual mode)</label>
       <input type="range" id="exposure" name="video_exposure" min="-13" max="0" step="0.1"
              value="{{ settings.video_exposure|default:-6 }}">
   
@@ -117,16 +117,15 @@
       <input type="range" id="gain" name="video_gain" min="0" max="10" step="0.1"
              value="{{ settings.video_gain|default:5 }}">
   
-      <label for="exposure_mode">Belichtungsmodus</label>
+      <label for="exposure_mode">Exposure Mode</label>
       <select id="exposure_mode" name="video_exposure_mode">
-        <option value="manual" {% if settings.video_exposure_mode == 'manual' %}selected{% endif %}>Manuell</option>
+        <option value="manual" {% if settings.video_exposure_mode == 'manual' %}selected{% endif %}>Manual</option>
         <option value="auto" {% if settings.video_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
       </select>
   
-      <button type="submit" style="margin-top: 1em;">✅ Übernehmen</button>
+      <button type="submit" style="margin-top: 1em;">✅ Apply</button>
     </form>
   </div>
-  
 </div>
 
 <script>
@@ -152,7 +151,7 @@
       .then(r => r.json())
       .then(data => {
         const el = document.getElementById("recordStatus");
-        el.innerText = data.recording ? "● Aufnahme läuft" : "– nicht aktiv";
+        el.innerText = data.recording ? "● Recording..." : "– Not recording";
         el.style.color = data.recording ? "red" : "white";
       });
   }

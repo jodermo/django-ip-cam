@@ -1,233 +1,245 @@
 {% extends "base.html" %}
 {% block content %}
-    <h2 style="text-align:center;">Timelaps Gallery</h2>
-    <canvas id="photoCanvas" width="640" height="480"></canvas>
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+  }
 
-    <div class="controls">
-        <button onclick="prevImage()">Previous</button>
-        <button onclick="togglePlayPause()" id="playPauseBtn">Play</button>
-        <button onclick="nextImage()">Next</button>
-    </div>
+  #galleryContainer {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: black;
+  }
 
-    <div class="slider-container">
-        <label>Interval (ms): <span id="speedValue">3000</span></label><br>
-        <input type="range" id="speedRange" min="25" max="1000" step="25" value="3000" onchange="updateSpeed()">
-    </div>
+  #photoCanvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    background: black;
+  }
 
-    <div class="slider-container">
-        <label>Duration (sec): <span id="durationValue">30</span></label><br>
-        <input type="range" id="durationRange" min="5" max="300" step="5" value="30" onchange="updateDuration()">
-    </div>
+  .overlay-controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1em;
+    border-radius: 8px;
+    color: white;
+  }
 
-    <div class="slider-container">
-        <label>Timeline: <span id="currentIndex">0</span> / <span id="totalCount">0</span></label><br>
-        <input type="range" id="timeSlider" min="0" value="0" onchange="sliderJump()">
-    </div>
-    <div id="thumbnailBar" style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; max-height: 120px; overflow-y: auto;">
-        {% for photo in photos %}
-            <img src="{{ photo }}" width="80" style="cursor: pointer;" onclick="jumpToIndex({{ forloop.counter0 }})">
-        {% endfor %}
-    </div>
-    <hr>
+  .overlay-controls button {
+    margin: 0.3em;
+    padding: 0.4em 0.8em;
+    background: #1e90ff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
 
+  .overlay-controls button:hover {
+    background: #3aa0ff;
+  }
 
-    <h1>Foto-Einstellungen</h1>
-    
+  .settings-popup {
+    position: absolute;
+    top: 120px;
+    left: 10px;
+    background: rgba(20, 20, 20, 0.95);
+    padding: 1em;
+    border-radius: 8px;
+    color: white;
+    display: none;
+    z-index: 20;
+  }
+
+  .settings-popup input[type=range] {
+    width: 100%;
+  }
+
+  .settings-popup select,
+  .settings-popup button {
+    margin-top: 0.5em;
+  }
+
+  #thumbnailBar {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 15;
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px;
+    border-radius: 6px;
+  }
+
+  #thumbnailBar img.selected {
+    outline: 2px solid yellow;
+  }
+</style>
+
+<div id="galleryContainer">
+  <canvas id="photoCanvas" width="640" height="480"></canvas>
+
+  <div class="overlay-controls">
+    <button onclick="prevImage()">⏪ Prev</button>
+    <button onclick="togglePlayPause()" id="playPauseBtn">▶️ Play</button>
+    <button onclick="nextImage()">⏩ Next</button>
+    <button onclick="autoAdjust()">🌞 Auto Adjust</button>
+    <button onclick="takePhoto()">📷 Take Photo</button>
+    <button onclick="toggleSettings()">⚙️ Settings</button>
+    <form method="post" action="{% url 'reset_camera' %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit">🔄 Reset</button>
+    </form>
+  </div>
+
+  <div class="settings-popup" id="settingsPopup">
     <form method="post" action="{% url 'update_photo_settings' %}">
       {% csrf_token %}
-    
-      <label>Brightness:
-        <input type="range" step="0.1" name="photo_brightness" value="{{ settings.photo_brightness }}">
-      </label><br>
-    
-      <label>Contrast:
-        <input type="range" step="0.1" name="photo_contrast" value="{{ settings.photo_contrast }}">
-      </label><br>
-    
-      <label>Saturation:
-        <input type="range" step="0.1" name="photo_saturation" value="{{ settings.photo_saturation }}">
-      </label><br>
-    
-      <label>Exposure:
-        <input type="range" step="0.1" name="photo_exposure" value="{{ settings.photo_exposure }}">
-      </label><br>
-    
-      <label>Gain:
-        <input type="range" step="0.1" name="photo_gain" value="{{ settings.photo_gain }}">
-      </label><br>
-    
-      <label>Exposure Mode:
-        <select name="photo_exposure_mode">
-          <option value="manual" {% if settings.photo_exposure_mode == 'manual' %}selected{% endif %}>Manuell</option>
-          <option value="auto" {% if settings.photo_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
-        </select>
-      </label><br>
-    
-      <button type="submit">Speichern</button>
+      <label>Brightness:</label>
+      <input type="range" step="0.1" name="photo_brightness" min="0" max="255" value="{{ settings.photo_brightness }}"><br>
+
+      <label>Contrast:</label>
+      <input type="range" step="0.1" name="photo_contrast" min="0" max="255" value="{{ settings.photo_contrast }}"><br>
+
+      <label>Saturation:</label>
+      <input type="range" step="0.1" name="photo_saturation" min="0" max="255" value="{{ settings.photo_saturation }}"><br>
+
+      <label>Exposure (-13 to 0):</label>
+      <input type="range" step="0.1" name="photo_exposure" min="-13" max="0" value="{{ settings.photo_exposure }}"><br>
+
+      <label>Gain (0–10):</label>
+      <input type="range" step="0.1" name="photo_gain" min="0" max="10" value="{{ settings.photo_gain }}"><br>
+
+      <label>Exposure Mode:</label>
+      <select name="photo_exposure_mode">
+        <option value="manual" {% if settings.photo_exposure_mode == 'manual' %}selected{% endif %}>Manual</option>
+        <option value="auto" {% if settings.photo_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
+      </select><br>
+
+      <button type="submit">✅ Apply</button>
     </form>
+  </div>
 
-    <form method="post" action="{% url 'reset_camera' %}">
-        {% csrf_token %}
-        <button type="submit">🔄 Kamera zurücksetzen</button>
-    </form>
-    
-    <button onclick="takePhoto()" style="margin-top: 10px;">📷 Manuelles Foto aufnehmen</button>
+  <div id="thumbnailBar">
+    {% for photo in photos %}
+      <img src="{{ photo }}" width="80" onclick="jumpToIndex({{ forloop.counter0 }})">
+    {% endfor %}
+  </div>
+</div>
 
+<script>
+  const photos = {{ photos|safe }};
+  let index = 0;
+  let playing = false;
+  let intervalId = null;
+  let stopTimeoutId = null;
+  let intervalMs = 3000;
+  let durationSec = 30;
 
-    <button onclick="autoAdjust()">
-        🌞 Auto-Anpassen vom Livebild
-    </button>
+  const canvas = document.getElementById("photoCanvas");
+  const ctx = canvas.getContext("2d");
 
+  function toggleSettings() {
+    const popup = document.getElementById("settingsPopup");
+    popup.style.display = popup.style.display === "block" ? "none" : "block";
+  }
 
-    <script>
-        const photos = {{ photos|safe }};
-        let index = 0;
-        let playing = false;
-        let intervalId = null;
-        let stopTimeoutId = null;
-        let intervalMs = 3000;
-        let durationSec = 30;
+  function autoAdjust() {
+    fetch("{% url 'auto_photo_adjust' %}", {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    }).then(r => r.json()).then(data => {
+      alert(data.status);
+      location.reload();
+    });
+  }
 
-        const canvas = document.getElementById("photoCanvas");
-        const ctx = canvas.getContext("2d");
+  function takePhoto() {
+    fetch("{% url 'take_photo_now' %}", {
+      method: "POST",
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    })
+    .then(response => response.json())
+    .then(data => {
+      alert(data.status || "Photo taken");
+      location.reload();
+    })
+    .catch(err => alert("Error while taking photo: " + err));
+  }
 
-        const speedSlider = document.getElementById("speedRange");
-        const speedLabel = document.getElementById("speedValue");
+  function loadImage(src) {
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        const durationSlider = document.getElementById("durationRange");
-        const durationLabel = document.getElementById("durationValue");
+      const match = src.match(/photo_(\d{8}_\d{6})/);
+      if (match) {
+        const raw = match[1];
+        const localDate = new Date(
+          `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}T${raw.slice(9, 11)}:${raw.slice(11, 13)}:${raw.slice(13, 15)}`
+        );
 
-        const timeSlider = document.getElementById("timeSlider");
-        const currentIndexLabel = document.getElementById("currentIndex");
-        const totalCountLabel = document.getElementById("totalCount");
+        const timestamp = `⏱ ${localDate.toLocaleDateString()} ${localDate.toLocaleTimeString()}`;
+        ctx.font = "18px monospace";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(0, 0, canvas.width, 30);
+        ctx.fillStyle = "white";
+        ctx.fillText(timestamp, 10, 22);
+      }
+    };
+    img.src = src;
+  }
 
-        totalCountLabel.textContent = photos.length - 1;
-        timeSlider.max = photos.length - 1;
+  function showImage(i) {
+    if (photos.length > 0) {
+      index = (i + photos.length) % photos.length;
+      loadImage(photos[index]);
+    }
+    document.querySelectorAll("#thumbnailBar img").forEach((img, i) => {
+      img.classList.toggle("selected", i === index);
+    });
+  }
 
-        function jumpToIndex(i) {
-            showImage(i);
-        }
-        function autoAdjust(){
-            fetch("{% url 'auto_photo_adjust' %}", {
-                method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-            }).then(r => r.json()).then(data => {
-                alert(data.status);
-                location.reload();
-            })
-        }
-        function takePhoto() {
-            fetch("{% url 'take_photo_now' %}", {
-                method: "POST",
-                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert(data.status || "Foto aufgenommen");
-                location.reload();
-            })
-            .catch(err => alert("Fehler beim Auslösen: " + err));
-        }
+  function nextImage() {
+    showImage(index + 1);
+  }
 
-        function applyAutoPhotoSettings() {
-            fetch("{% url 'auto_photo_settings' %}", {
-                method: "POST",
-                headers: {
-                    "X-CSRFToken": "{{ csrf_token }}",
-                }
-            })
-            .then(response => response.json())
-            .then(data => alert(data.message));
-        }
+  function prevImage() {
+    showImage(index - 1);
+  }
 
-        function loadImage(src) {
-            const img = new Image();
-            img.onload = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  function togglePlayPause() {
+    playing = !playing;
+    document.getElementById("playPauseBtn").textContent = playing ? "⏸ Pause" : "▶️ Play";
 
-                const match = src.match(/photo_(\d{8}_\d{6})/);
-                if (match) {
-                    const raw = match[1]; // z. B. 20250426_101234
-                    const year = raw.slice(0, 4);
-                    const month = raw.slice(4, 6);
-                    const day = raw.slice(6, 8);
-                    const hour = raw.slice(9, 11);
-                    const minute = raw.slice(11, 13);
-                    const second = raw.slice(13, 15);
+    if (playing) {
+      intervalId = setInterval(nextImage, intervalMs);
+      stopTimeoutId = setTimeout(() => togglePlayPause(), durationSec * 1000);
+    } else {
+      clearInterval(intervalId);
+      clearTimeout(stopTimeoutId);
+    }
+  }
 
-                    // Erzeuge echte JS-Zeit in der lokalen Zeitzone
-                    const localDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+  function jumpToIndex(i) {
+    showImage(i);
+  }
 
-                    const timestamp = `⏱ ${localDate.toLocaleDateString()} ${localDate.toLocaleTimeString()}`;
-
-
-                    ctx.font = "18px monospace";
-                    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-                    ctx.fillRect(0, 0, canvas.width, 30);
-                    ctx.fillStyle = "white";
-                    ctx.fillText(timestamp, 10, 22);
-                }
-
-            };
-            img.src = src;
-        }
-
-        function showImage(i) {
-            if (photos.length > 0) {
-                index = (i + photos.length) % photos.length;
-                loadImage(photos[index]);
-                timeSlider.value = index;
-                currentIndexLabel.textContent = index;
-            }
-            document.querySelectorAll("#thumbnailBar img").forEach((img, i) => {
-                img.classList.toggle("selected", i === index);
-            });
-        }
-
-        function nextImage() {
-            showImage(index + 1);
-        }
-
-        function prevImage() {
-            showImage(index - 1);
-        }
-
-        function togglePlayPause() {
-            playing = !playing;
-            document.getElementById("playPauseBtn").textContent = playing ? "Pause" : "Play";
-
-            if (playing) {
-                intervalId = setInterval(nextImage, intervalMs);
-                stopTimeoutId = setTimeout(() => togglePlayPause(), durationSec * 1000);
-            } else {
-                clearInterval(intervalId);
-                clearTimeout(stopTimeoutId);
-            }
-        }
-
-        function updateSpeed() {
-            intervalMs = parseInt(speedSlider.value);
-            speedLabel.textContent = intervalMs;
-
-            if (playing) {
-                clearInterval(intervalId);
-                intervalId = setInterval(nextImage, intervalMs);
-            }
-        }
-
-        function updateDuration() {
-            durationSec = parseInt(durationSlider.value);
-            durationLabel.textContent = durationSec;
-        }
-
-        function sliderJump() {
-            const target = parseInt(timeSlider.value);
-            showImage(target);
-        }
-
-        // Initiales Bild laden
-        if (photos.length > 0) {
-            showImage(0);
-        }
-    </script>
+  if (photos.length > 0) {
+    showImage(0);
+  }
+</script>
 {% endblock %}
