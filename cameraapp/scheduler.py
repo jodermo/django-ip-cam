@@ -19,45 +19,42 @@ def get_camera_settings():
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
 
-def take_photo():
-    """Captures photo from shared live frame, or opens camera if not available."""
-    frame = None
 
-    # Try shared frame first
+def take_photo():
+    from .globals import latest_frame, latest_frame_lock
+
     with latest_frame_lock:
         if latest_frame is not None:
             frame = latest_frame.copy()
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
+            if cv2.imwrite(filepath, frame):
+                print(f"[PHOTO] Saved from stream: {filepath}")
+                return True
+            else:
+                print("[PHOTO] Failed to save shared frame.")
+                return False
 
-    if frame is not None:
-        print("[PHOTO] Using shared live frame.")
-    else:
-        print("[PHOTO] No shared frame. Attempting direct capture.")
-        camera_url_raw = os.getenv("CAMERA_URL", "0")
-        camera_url = int(camera_url_raw) if camera_url_raw.isdigit() else camera_url_raw
-        cap = cv2.VideoCapture(camera_url)
+    # Fallback: open camera only if not in use
+    try:
+        cap = cv2.VideoCapture(int(os.getenv("CAMERA_URL", "0")))
         if not cap.isOpened():
-            print("[PHOTO] Failed to open camera.")
+            print("[PHOTO] Fallback camera not available.")
             return False
-
         settings = get_camera_settings()
         apply_cv_settings(cap, settings, mode="photo")
-
         ret, frame = cap.read()
         cap.release()
-        if not ret or frame is None:
-            print("[PHOTO] Failed to capture image from camera.")
-            return False
+        if ret:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
+            if cv2.imwrite(filepath, frame):
+                print(f"[PHOTO] Saved from fallback: {filepath}")
+                return True
+    except Exception as e:
+        print(f"[PHOTO] Exception: {e}")
+    return False
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
-    success = cv2.imwrite(filepath, frame)
-
-    if success:
-        print(f"[PHOTO] Saved: {filepath}")
-    else:
-        print("[PHOTO] Failed to save image.")
-
-    return success
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
     """Waits until the specified table is available (e.g., after migrations)."""

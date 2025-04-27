@@ -1,4 +1,5 @@
 import threading
+import os
 from django.apps import AppConfig
 
 class CameraappConfig(AppConfig):
@@ -14,6 +15,7 @@ class CameraappConfig(AppConfig):
         def start_safe():
             from .scheduler import wait_for_table, start_photo_scheduler
             wait_for_table("cameraapp_camerasettings")
-            start_photo_scheduler()
+            if os.environ.get("RUN_SCHEDULER", "1") == "1":
+                start_photo_scheduler()
 
         threading.Thread(target=start_safe, daemon=True).start()
