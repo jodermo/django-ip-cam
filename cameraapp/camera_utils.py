@@ -165,10 +165,14 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
             camera_instance.release()
             logger.info("[RESTART] Camera released.")
 
-            try:
-                force_device_reset("/dev/video0")
-            except Exception as e:
-                logger.warning(f"[RESTART] Device reset failed: {e}")
+        # Device reset UNBEDINGT immer versuchen, auch wenn vorher schon .release() aufgerufen wurde!
+        try:
+            force_device_reset("/dev/video0")
+        except Exception as e:
+            logger.warning(f"[RESTART] Device reset failed: {e}")
+
+        except Exception as e:
+            logger.warning(f"[RESTART] Device reset failed: {e}")
 
             gc.collect()
             time.sleep(1.5)
@@ -317,7 +321,15 @@ def release_and_reset_camera():
 
         if camera_instance and camera_instance.isOpened():
             camera_instance.release()
-            print("[RELEASE] camera_instance released")
+            logger.info("[RESTART] Camera released.")
+
+        # Device reset UNBEDINGT immer versuchen, auch wenn vorher schon .release() aufgerufen wurde!
+        try:
+            force_device_reset("/dev/video0")
+        except Exception as e:
+            logger.warning(f"[RESTART] Device reset failed: {e}")
+
+        time.sleep(1.0)
 
         camera_instance = None
         camera_capture = None

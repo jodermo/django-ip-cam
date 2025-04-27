@@ -131,7 +131,7 @@ class LiveStreamJob:
         try:
             logger.warning("[LIVE] Performing fallback: force_device_reset")
             force_device_reset("/dev/video0")
-            time.sleep(1.5)
+            time.sleep(2.5)
         except Exception as e:
             logger.error(f"[LIVE] force_device_reset failed: {e}")
 
