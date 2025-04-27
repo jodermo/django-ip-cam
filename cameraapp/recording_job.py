@@ -1,19 +1,21 @@
-# cameraapp/recording_job.py
-
 import os
 import threading
 import time
 import logging
 import cv2
-from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
+from typing import Callable
+
+from .camera_utils import apply_cv_settings, get_camera_settings
+from .livestream_job import LiveStreamJob
 from . import globals as app_globals
+from .globals import camera
 
 logger = logging.getLogger(__name__)
 
 
 def safe_restart_livestream():
     """
-    Stop any running livestream and restart it using shared globals.
+    Stop any running livestream and restart it using the shared camera manager.
     """
     if app_globals.livestream_job and getattr(app_globals.livestream_job, 'running', False):
         logger.info("[RECORDING] Stopping existing livestream...")
@@ -24,28 +26,39 @@ def safe_restart_livestream():
             logger.warning(f"[RECORDING] Error stopping livestream: {e}")
 
     time.sleep(1.0)
-    settings = get_camera_settings()
-    cap = try_open_camera(int(os.getenv("CAMERA_URL", "0")), retries=3, delay=1.0)
-    if not cap or not cap.isOpened():
-        logger.error("[RECORDING] Failed to reopen camera for livestream.")
+
+    if not camera or not camera.cap or not camera.cap.isOpened():
+        logger.error("[RECORDING] Camera not ready for livestream restart")
         return
 
-    apply_cv_settings(cap, settings, mode="video")
-    from .livestream_job import LiveStreamJob
+    settings = get_camera_settings()
+    if settings:
+        try:
+            apply_cv_settings(camera.cap, settings, mode="video")
+        except Exception as e:
+            logger.warning(f"[RECORDING] Failed to apply settings: {e}")
+
     job = LiveStreamJob(
-        camera_source=int(os.getenv("CAMERA_URL", "0")),
+        camera_source=0,
         frame_callback=lambda f: setattr(app_globals, 'latest_frame', f.copy()),
-        shared_capture=cap
+        shared_capture=camera.cap
     )
     job.start()
     app_globals.livestream_job = job
-    globals()["livestream_job"] = job
-    logger.info("[RECORDING] Livestream restarted successfully.")
+    logger.info("[RECORDING] Livestream restarted successfully")
 
 
 class RecordingJob:
-    def __init__(self, filepath: str, duration: float, fps: float, resolution: tuple[int,int], 
-                 codec: str, frame_provider: callable, lock: threading.Lock):
+    def __init__(
+        self,
+        filepath: str,
+        duration: float,
+        fps: float,
+        resolution: tuple[int, int],
+        codec: str,
+        frame_provider: Callable[[], any],
+        lock: threading.Lock
+    ):
         self.filepath = filepath
         self.duration = duration
         self.fps = fps
@@ -66,8 +79,9 @@ class RecordingJob:
         logger.info(f"[RecordingJob] Opening writer: {self.filepath}")
         fourcc = cv2.VideoWriter_fourcc(*self.codec)
         out = cv2.VideoWriter(self.filepath, fourcc, self.fps, self.resolution)
+
         if not out.isOpened():
-            logger.error("[RecordingJob] Cannot open VideoWriter.")
+            logger.error(f"[RecordingJob] Cannot open VideoWriter for {self.filepath}")
             self.active = False
             return
 
@@ -82,9 +96,9 @@ class RecordingJob:
             if frame is None:
                 if empty_start is None:
                     empty_start = time.time()
-                    logger.debug("[RecordingJob] No frame yet, waiting...")
-                elif (time.time() - empty_start) > max_empty:
-                    logger.error("[RecordingJob] No frames for too long, aborting.")
+                    logger.debug("[RecordingJob] Waiting for first frame...")
+                elif time.time() - empty_start > max_empty:
+                    logger.error("[RecordingJob] No frames for too long, aborting")
                     break
                 time.sleep(0.05)
                 continue
@@ -96,7 +110,7 @@ class RecordingJob:
                 out.write(resized)
                 self.frame_count += 1
                 if self.frame_count % 10 == 0:
-                    logger.info(f"[RecordingJob] Wrote {self.frame_count} frames...")
+                    logger.info(f"[RecordingJob] Wrote {self.frame_count} frames")
             except Exception as e:
                 logger.error(f"[RecordingJob] Write error: {e}")
                 break
@@ -107,5 +121,11 @@ class RecordingJob:
         safe_restart_livestream()
 
     def stop(self) -> None:
+        if not self.active:
+            logger.info(f"[RecordingJob] Already inactive: {self.filepath}")
+            return
         logger.info(f"[RecordingJob] Stop requested: {self.filepath}")
         self.active = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=2.0)
+            logger.info("[RecordingJob] Thread joined after stop")

@@ -1,5 +1,3 @@
-# cameraapp/sheduler.py
-
 import os
 import time
 import cv2
@@ -8,74 +6,61 @@ import numpy as np
 from django.conf import settings
 from django.db import connections
 
-from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream
-from .globals import latest_frame_lock, latest_frame, livestream_job, camera_lock
+from .camera_utils import apply_cv_settings, get_camera_settings, force_restart_livestream
+from .globals import latest_frame_lock, latest_frame, livestream_job, camera_lock, camera
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
-
-
-
 def take_photo():
     """
-    Capture a photo from livestream or fallback directly from webcam.
+    Capture a photo from the livestream, or fallback directly from CameraManager.
+    Returns file path on success, None on failure.
     """
-    used_fallback = False
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
 
     if livestream_job and livestream_job.running:
         with latest_frame_lock:
             if latest_frame is not None:
                 frame = latest_frame.copy()
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
                 if cv2.imwrite(filepath, frame):
                     print(f"[PHOTO] Saved from stream: {filepath}")
-                    return True
+                    return filepath
                 else:
-                    print("[PHOTO] Failed to save shared frame.")
-                    return False
+                    print("[PHOTO] Failed to save frame from stream.")
+                    return None
+            else:
+                print("[PHOTO] No frame available from stream.")
 
-    print("[PHOTO] Livestream not running or no frame available. Trying direct capture...")
+    print("[PHOTO] Livestream not available. Trying fallback using CameraManager...")
+
     with camera_lock:
-        settings = get_camera_settings()
-        cap = try_open_camera(0, retries=3, delay=1.0)
-        if not cap or not cap.isOpened():
-            print("[PHOTO] Camera not available for fallback.")
-            return False
+        if not camera or not camera.cap or not camera.cap.isOpened():
+            print("[PHOTO] CameraManager not ready or no available capture.")
+            return None
 
-        apply_cv_settings(cap, settings, mode="photo")
+        settings = get_camera_settings()
+        if settings:
+            apply_cv_settings(camera.cap, settings, mode="photo")
+
+        time.sleep(0.3)
+        ret, frame = camera.cap.read()
         time.sleep(0.3)
 
-        ret, frame = cap.read()
-
-        # Sehr wichtig: Kamera *richtig* schließen und Delay einbauen
-        cap.release()
-        time.sleep(0.5)
-
         if not ret or frame is None:
-            print("[PHOTO] Failed to capture fallback frame.")
-            return False
+            print("[PHOTO] Failed to capture frame from fallback.")
+            return None
 
-        used_fallback = True
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
         if cv2.imwrite(filepath, frame):
-            print(f"[PHOTO] Saved from fallback: {filepath}")
+            print(f"[PHOTO] Saved from fallback capture: {filepath}")
         else:
-            print("[PHOTO] Failed to save fallback frame.")
-            return False
+            print("[PHOTO] Failed to write fallback photo.")
+            return None
 
-    if used_fallback:
-        print("[PHOTO] Restarting livestream after fallback photo.")
-        # Wiederum Delay, um sicherzustellen, dass das Device wirklich frei ist
-        time.sleep(0.5)
-        force_restart_livestream()
-
-    return True
-
-
-
+    print("[PHOTO] Restarting livestream after fallback...")
+    force_restart_livestream()
+    return filepath
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
     """
@@ -89,21 +74,27 @@ def wait_for_table(table_name, db_alias="default", timeout=30):
             return
         except Exception:
             time.sleep(1)
-    print(f"[ERROR] Timeout: Table '{table_name}' not found after {timeout}s.")
-
+    print(f"[ERROR] Timeout: Table '{table_name}' not found after {timeout} seconds.")
 
 def start_photo_scheduler():
     """
-    Main loop for triggering timelapse photos based on settings.
+    Starts the periodic photo capture loop based on configured intervals.
     """
-    print("[SCHEDULER] Starting timelapse scheduler...")
+    print("[SCHEDULER] Starting photo scheduler...")
     wait_for_table("cameraapp_camerasettings")
 
     while True:
-        settings_obj = get_camera_settings()
-        if settings_obj and settings_obj.timelapse_enabled:
-            take_photo()
-            interval_min = settings_obj.photo_interval_min
-        else:
-            interval_min = 15
+        try:
+            settings_obj = get_camera_settings()
+            if settings_obj and settings_obj.timelapse_enabled:
+                print(f"[SCHEDULER] Timelapse active. Taking photo at {datetime.now()}")
+                take_photo()
+                interval_min = settings_obj.photo_interval_min
+            else:
+                interval_min = 15
+                print(f"[SCHEDULER] Timelapse disabled. Sleeping {interval_min} minutes.")
+        except Exception as e:
+            print(f"[SCHEDULER] Error during scheduler cycle: {e}")
+            interval_min = 5
+
         time.sleep(interval_min * 60)

@@ -4,8 +4,9 @@ import os
 import cv2
 import time
 import threading
+import glob
 from cameraapp.models import CameraSettings
-from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe
+from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe, camera, update_livestream_job
 from .globals import camera_lock, camera_capture
 # camera_instance.py
 from .camera_manager import CameraManager
@@ -15,44 +16,46 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
-CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
+
+if CAMERA_URL_RAW == "0" and not os.path.exists("/dev/video0"):
+    fallback_device = find_working_camera_device()
+    CAMERA_URL = fallback_device if fallback_device else 0
+    print(f"[CAMERA_CORE] CAMERA_URL fallback resolved to: {CAMERA_URL}")
+else:
+    CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
+
 
 camera_instance = None 
 
-camera = CameraManager()
+camera = None 
 
 def init_camera():
-    global camera_capture
+    global camera
+    if camera:
+        camera.stop()
+        time.sleep(1.0)
 
-    with camera_lock:
-        print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
+    print("[CAMERA_CORE] Initializing CameraManager...")
+    camera = CameraManager()
 
-        if camera_capture:
-            print("[CAMERA_CORE] Releasing previous camera instance.")
-            camera_capture.release()
-            time.sleep(1.0)
 
-        print(f"[CAMERA_CORE] Attempting to open camera from source: {CAMERA_URL}")
-        camera_capture = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
-
-        if not camera_capture or not camera_capture.isOpened():
-            print("[CAMERA_CORE] Failed to open camera after retries.")
-            return
-
-        print("[CAMERA_CORE] Camera opened successfully.")
-
-        settings = get_camera_settings_safe()  
-        if not settings:
-            print("[CAMERA_CORE] No CameraSettings found in DB.")
-            return
-
-        apply_cv_settings(
-            camera_capture,
-            settings,
-            mode="video",
-            reopen_callback=lambda: try_open_camera(CAMERA_URL)
-        )
-
+def find_working_camera_device():
+    candidates = sorted(glob.glob("/dev/video*"))
+    print(f"[CAMERA_CORE] Scanning for available video devices: {candidates}")
+    for device in candidates:
+        for backend in [cv2.CAP_V4L2, cv2.CAP_ANY]:
+            try:
+                cap = cv2.VideoCapture(device, backend)
+                if cap.isOpened():
+                    ret, _ = cap.read()
+                    cap.release()
+                    if ret:
+                        print(f"[CAMERA_CORE] Found working camera: {device} using backend {backend}")
+                        return device
+            except Exception as e:
+                print(f"[CAMERA_CORE] Error testing {device} with backend {backend}: {e}")
+    print("[CAMERA_CORE] No working camera found.")
+    return None
 
 
 def reset_to_default():

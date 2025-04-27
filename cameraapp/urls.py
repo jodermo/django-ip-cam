@@ -21,4 +21,5 @@ urlpatterns = [
     path("reboot/", views.reboot_pi, name="reboot_pi"),
     path("media-browser/", views.media_browser, name="media_browser"),
     path("manual_restart_camera/", views.manual_restart_camera, name="manual_restart_camera"),
+    path("camera_status/", views.camera_status, name="camera_status"),
 ]

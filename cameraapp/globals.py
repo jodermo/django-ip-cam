@@ -16,3 +16,4 @@ camera_instance = None
 active_stream_viewers = 0
 last_disconnect_time = None
 recording_timeout = 30
+camera = None

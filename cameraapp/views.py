@@ -29,7 +29,7 @@ from .camera_core import (
     init_camera, reset_to_default,
     apply_photo_settings, apply_auto_settings, auto_adjust_from_frame, try_open_camera_safe,
     try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream, get_camera_settings_safe,
-    release_and_reset_camera, camera
+    release_and_reset_camera, camera, LiveStreamJob, update_livestream_job
 )
 from .camera_utils import safe_restart_camera_stream
 from .globals import (
@@ -58,9 +58,8 @@ os.makedirs(PHOTO_DIR, exist_ok=True)
 
 
 def get_livestream_job(camera_source, frame_callback=None, shared_capture=None):
-    global livestream_job
-    from cameraapp.livestream_job import LiveStreamJob
-    livestream_job = LiveStreamJob(camera_source, frame_callback, shared_capture)
+    global livestream_job, camera
+    livestream_job = LiveStreamJob(camera_source, frame_callback, shared_capture or camera)
     globals()["livestream_job"] = livestream_job
     return livestream_job
 
@@ -73,7 +72,7 @@ def update_latest_frame(frame):
 livestream_job = get_livestream_job(
     camera_source=CAMERA_URL,
     frame_callback=lambda f: update_latest_frame(f),
-    shared_capture=camera_instance
+    shared_capture=camera.cap if camera else None
 )
 globals()["livestream_job"] = livestream_job
 
@@ -100,6 +99,10 @@ def reboot_pi(request):
     return redirect("settings_view")
 
 
+@require_GET
+@login_required
+def camera_status(request):
+    return JsonResponse({"camera_url": str(CAMERA_URL)})
 
 
 
@@ -114,7 +117,7 @@ def generate_frames():
             print("[STREAM] Livestream job not running, exiting generator.")
             break
 
-        frame = livestream_job.get_frame()
+        frame = latest_frame.copy() if latest_frame is not None else None
 
         if frame is None:
             time.sleep(0.1)
@@ -140,14 +143,19 @@ def generate_frames():
 
 
 
-
 @login_required
 def video_feed(request):
+    global camera
     frame = camera.get_frame()
     if frame is None:
+        print("[VIDEO_FEED] No frame available. Returning 503.")
         return HttpResponse("No frame", status=503)
 
-    return StreamingHttpResponse(generate_frames(), content_type="multipart/x-mixed-replace; boundary=frame")
+    print("[VIDEO_FEED] Frame available. Starting streaming response.")
+    return StreamingHttpResponse(
+        generate_frames(),
+        content_type="multipart/x-mixed-replace; boundary=frame"
+    )
 
 
 
@@ -179,29 +187,15 @@ def stream_page(request):
                 livestream_job.stop()
             time.sleep(1.0)
 
-            if camera_instance and camera_instance.isOpened():
+            if camera and camera.cap and camera.cap.isOpened():
                 release_and_reset_camera()
-                print("[RELEASE] Camera released. Verifiziere Freigabe...")
-                for i in range(5):
-                    if os.path.exists("/dev/video0"):
-                        try:
-                            test_cap = cv2.VideoCapture(0)
-                            if test_cap.isOpened():
-                                test_cap.release()
-                                time.sleep(1.5)
-                                print("[RELEASE] Kamera testweise geöffnet → Freigabe erfolgreich.")
-                                break
-                        except:
-                            pass
-                    print(f"[RELEASE] Versuch {i+1} – Kamera noch blockiert...")
-                    time.sleep(1.0)
-                else:
-                    print("[RELEASE] Kamera nach 5 Versuchen nicht freigegeben. Fortfahren mit Risiko.")
+                print("[RELEASE] Camera released via CameraManager.")
 
-
+            wait_until_camera_available()
             init_camera()
-            if livestream_job:
-                livestream_job.start()
+            with livestream_resume_lock:
+                if not livestream_job.running:
+                    livestream_job.start()
 
     livestream_job = get_livestream_job(
         camera_source=CAMERA_URL,
@@ -210,7 +204,9 @@ def stream_page(request):
     )
     globals()["livestream_job"] = livestream_job
     if livestream_job and not livestream_job.running:
-        livestream_job.start()
+        with livestream_resume_lock:
+            if not livestream_job.running:
+                livestream_job.start()
 
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
@@ -605,10 +601,11 @@ def update_photo_settings(request):
 
 
 def pause_livestream():
-    if livestream_job.running:
-        livestream_job.stop()
-        print("[PHOTO] Livestream was paused for photo capture.")
-        time.sleep(0.5)
+    with livestream_resume_lock:
+        if livestream_job.running:
+            livestream_job.stop()
+            print("[PHOTO] Livestream was paused for photo capture.")
+            time.sleep(0.5)
 
 
 def resume_livestream():
@@ -619,7 +616,9 @@ def resume_livestream():
         time.sleep(1.5)
 
         for attempt in range(3):
-            livestream_job.start()
+            with livestream_resume_lock:
+                if not livestream_job.running:
+                    livestream_job.start()
             time.sleep(1.0)
             if livestream_job.running and livestream_job.get_frame() is not None:
                 print("[PHOTO] Livestream restarted successfully.")
@@ -674,17 +673,13 @@ def auto_photo_adjust(request):
 
     # Fallback: temporäres Foto machen
     print("[AUTO-ADJUST] No live frame, capturing temp image.")
-    cap = cv2.VideoCapture(CAMERA_URL)
-    if not cap.isOpened():
+    if not camera or not camera.cap or not camera.cap.isOpened():
         return JsonResponse({"status": "camera not available"}, status=500)
 
-    # Wende vorab aktuelle Video-Settings an
-    apply_cv_settings(cap, settings, mode="video")
-    time.sleep(0.3)  # kleine Pause für Stabilisierung
-
-    ret, temp_frame = cap.read()
-    cap.release()
-    time.sleep(1.5)
+    apply_cv_settings(camera.cap, settings, mode="video")
+    time.sleep(0.3)
+    ret, temp_frame = camera.cap.read()
+    time.sleep(0.3)
 
     if not ret or temp_frame is None:
         return JsonResponse({"status": "could not capture frame"}, status=500)
@@ -723,14 +718,10 @@ def manual_restart_camera(request):
 
 def wait_until_camera_available(device_index=0, max_attempts=5, delay=1.0):
     for attempt in range(max_attempts):
-        cap = cv2.VideoCapture(device_index)
-        if cap.isOpened():
-            cap.release()
-            time.sleep(1.5)
-            print(f"[CAMERA_UTIL] /dev/video{device_index} ist verfügbar.")
+        if camera and camera.cap and camera.cap.isOpened():
+            print(f"[CAMERA_UTIL] CameraManager reports device available.")
             return True
-        else:
-            print(f"[CAMERA_UTIL] Warten auf /dev/video{device_index}... Versuch {attempt+1}/{max_attempts}")
-            time.sleep(delay)
-    print(f"[CAMERA_UTIL] /dev/video{device_index} NICHT verfügbar nach {max_attempts} Versuchen.")
+        print(f"[CAMERA_UTIL] Waiting for camera... attempt {attempt+1}/{max_attempts}")
+        time.sleep(delay)
+    print(f"[CAMERA_UTIL] Camera not available after {max_attempts} attempts.")
     return False
