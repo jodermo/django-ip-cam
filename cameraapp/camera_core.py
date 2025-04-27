@@ -34,7 +34,7 @@ def init_camera():
 
         print("[CAMERA_CORE] Camera opened successfully.")
 
-        settings = get_camera_settings()
+        settings = get_camera_settings_safe()  
         if not settings:
             print("[CAMERA_CORE] No CameraSettings found in DB.")
             return

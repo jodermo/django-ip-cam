@@ -4,71 +4,104 @@
 
 <style>
   html, body {
-    margin: 0; padding: 0; height: 100%; overflow: hidden; background: black;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: black;
   }
+
   #galleryContainer {
-    position: relative; width: 100vw; height: 100vh; background: black;
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: black;
   }
+
   #photoCanvas {
-    width: 100%; height: 100%; object-fit: contain; background: black; display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: black;
+    display: block;
   }
 
   .overlay-controls {
-    position: absolute; top: 10px; left: 10px; z-index: 10;
-    background: rgba(0,0,0,0.6); padding: 1em; border-radius: 8px; color: #fff;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1em;
+    border-radius: 8px;
+    color: white;
   }
+
   .overlay-controls button {
-    margin: 0.3em; padding: 0.4em 0.8em; background: #1e90ff; color: #fff;
-    border: none; border-radius: 5px; cursor: pointer;
+    margin: 0.3em;
+    padding: 0.4em 0.8em;
+    background: #1e90ff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
   }
-  .overlay-controls button:hover { background: #3aa0ff; }
 
-  /* Settings popup */
+  .overlay-controls button:hover {
+    background: #3aa0ff;
+  }
+
   .settings-popup {
-    position: absolute; top: 160px; left: 10px; width: 250px;
-    background: rgba(20,20,20,0.95); padding: 1em; border-radius: 8px;
-    color: #fff; display: none; z-index: 20;
-  }
-  .settings-popup input[type=range] { width: 100%; }
-  .settings-popup select, .settings-popup button { margin-top: 0.5em; }
-
-  /* Carousel wrapper */
-  #thumbnailWrapper {
-    position: absolute; bottom: 10px; left: 10px; right: 10px; height: 100px;
-    z-index: 15; overflow: hidden;
-  }
-  #thumbnailBar {
-    display: flex; gap: 8px; height: 100%; padding: 8px 40px;
-    background: rgba(0,0,0,0.6); border-radius: 6px;
-    overflow-x: auto; scroll-behavior: smooth;
-  }
-  .thumb-container {
-    position: relative; scroll-snap-align: start;
-  }
-  .thumb-container img {
-    border-radius: 4px; cursor: pointer; transition: transform .2s ease;
-  }
-  .thumb-container img:hover { transform: scale(1.05); }
-  .thumb-container img.selected { outline: 3px solid yellow; }
-
-  .thumb-tooltip {
-    position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.8); color: #fff; padding: 4px 8px;
-    border-radius: 4px; white-space: nowrap; font-size: .8em;
+    position: absolute;
+    top: 160px;
+    left: 10px;
+    background: rgba(20, 20, 20, 0.95);
+    padding: 1em;
+    border-radius: 8px;
+    color: white;
     display: none;
+    z-index: 20;
+    width: 250px;
   }
-  .thumb-container:hover .thumb-tooltip { display: block; }
 
-  /* Prev/Next arrows for carousel */
-  .carousel-btn {
-    position: absolute; top: calc(100% - 50px); width: 30px; height: 30px;
-    background: rgba(30,144,255,0.8); color: #fff; border: none;
-    border-radius: 50%; cursor: pointer; font-size: 1.2em;
-    display: flex; align-items: center; justify-content: center;
+  .settings-popup input[type=range] {
+    width: 100%;
   }
-  #thumbPrev { left: 10px; }
-  #thumbNext { right: 10px; }
-  .carousel-btn:hover { background: rgba(58,160,255,0.9); }
+
+  .settings-popup select,
+  .settings-popup button {
+    margin-top: 0.5em;
+  }
+
+  #thumbnailBar {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 15;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px;
+    border-radius: 6px;
+  }
+
+  #thumbnailBar img {
+    scroll-snap-align: start;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+
+  #thumbnailBar img:hover {
+    transform: scale(1.05);
+  }
+
+  #thumbnailBar img.selected {
+    outline: 3px solid yellow;
+  }
 </style>
 
 <div id="galleryContainer">
@@ -91,83 +124,115 @@
     <form method="post" action="{% url 'update_photo_settings' %}">
       {% csrf_token %}
       <label>Brightness:</label>
-      <input type="range" name="photo_brightness" min="0" max="255" step="0.1"
-             value="{{ settings.photo_brightness }}"><br>
+      <input type="range" step="0.1" name="photo_brightness" min="0" max="255" value="{{ settings.photo_brightness }}"><br>
+
       <label>Contrast:</label>
-      <input type="range" name="photo_contrast" min="0" max="255" step="0.1"
-             value="{{ settings.photo_contrast }}"><br>
+      <input type="range" step="0.1" name="photo_contrast" min="0" max="255" value="{{ settings.photo_contrast }}"><br>
+
       <label>Saturation:</label>
-      <input type="range" name="photo_saturation" min="0" max="255" step="0.1"
-             value="{{ settings.photo_saturation }}"><br>
+      <input type="range" step="0.1" name="photo_saturation" min="0" max="255" value="{{ settings.photo_saturation }}"><br>
+
       <label>Exposure (-13 to 0):</label>
-      <input type="range" name="photo_exposure" min="-13" max="0" step="0.1"
-             value="{{ settings.photo_exposure }}"><br>
+      <input type="range" step="0.1" name="photo_exposure" min="-13" max="0" value="{{ settings.photo_exposure }}"><br>
+
       <label>Gain (0–10):</label>
-      <input type="range" name="photo_gain" min="0" max="10" step="0.1"
-             value="{{ settings.photo_gain }}"><br>
+      <input type="range" step="0.1" name="photo_gain" min="0" max="10" value="{{ settings.photo_gain }}"><br>
+
       <label>Exposure Mode:</label>
       <select name="photo_exposure_mode">
-        <option value="manual" {% if settings.photo_exposure_mode=='manual' %}selected{% endif %}>Manual</option>
-        <option value="auto"   {% if settings.photo_exposure_mode=='auto'   %}selected{% endif %}>Auto</option>
+        <option value="manual" {% if settings.photo_exposure_mode == 'manual' %}selected{% endif %}>Manual</option>
+        <option value="auto" {% if settings.photo_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
       </select><br>
+
       <label>Play Speed (ms):</label>
-      <input type="range" id="speedRange" min="100" max="3000" step="100"
-             value="1000" oninput="updateSpeed(this.value)">
+      <input type="range" id="speedRange" min="100" max="3000" step="100" value="1000" oninput="updateSpeed(this.value)">
       <span id="speedLabel">1000</span><br>
+
       <label>Max Play Duration (sec):</label>
-      <input type="range" id="durationRange" min="5" max="300" step="5"
-             value="30" oninput="updateDuration(this.value)">
+      <input type="range" id="durationRange" min="5" max="300" step="5" value="30" oninput="updateDuration(this.value)">
       <span id="durationLabel">30</span><br>
+
       <button type="submit">✅ Apply</button>
     </form>
   </div>
 
-  <!-- Carousel -->
-  <div id="thumbnailWrapper">
-    <button id="thumbPrev" class="carousel-btn" onclick="scrollThumbnails(-200)">‹</button>
-    <div id="thumbnailBar">
-      {% for photo in photos %}
-        {% with raw=photo|slice:"-19:-4" %}
-          {% with
-            year=raw|slice:":4"
-            month=raw|slice:"4:6"
-            day=raw|slice:"6:8"
-            hour=raw|slice:"9:11"
-            minute=raw|slice:"11:13"
-            second=raw|slice:"13:15"
-          %}
-            {% with timestr=day|add:"/"|add:month|add:"/"|add:year
-               |add:" "|add:hour|add:":"|add:minute|add:":"|add:second %}
-              <div class="thumb-container">
-                <img src="{{ photo }}"
-                     width="80"
-                     onclick="jumpToIndex({{ forloop.counter0 }})"
-                     class="{% if forloop.first %}selected{% endif %}">
-                <div class="thumb-tooltip">{{ timestr }}</div>
-              </div>
-            {% endwith %}
-          {% endwith %}
-        {% endwith %}
-      {% endfor %}
-    </div>
-    <button id="thumbNext" class="carousel-btn" onclick="scrollThumbnails(200)">›</button>
+  <div id="thumbnailBar">
+    {% for photo in photos %}
+      <img src="{{ photo }}" width="80" onclick="jumpToIndex({{ forloop.counter0 }})">
+    {% endfor %}
   </div>
 </div>
 
 <script>
   const photos = {{ photos|safe }};
-  const thumbBar = document.getElementById("thumbnailBar");
-  let index = 0, playing = false, intervalId, stopTimeoutId;
-  let intervalMs = 1000, durationSec = 30;
+  let index = 0;
+  let playing = false;
+  let intervalId = null;
+  let stopTimeoutId = null;
+  let intervalMs = 1000;
+  let durationSec = 30;
 
   const canvas = document.getElementById("photoCanvas");
   const ctx = canvas.getContext("2d");
 
+  function toggleSettings() {
+    const popup = document.getElementById("settingsPopup");
+    popup.style.display = popup.style.display === "block" ? "none" : "block";
+  }
+
+  function updateSpeed(val) {
+    intervalMs = parseInt(val);
+    document.getElementById("speedLabel").textContent = val;
+    if (playing) {
+      clearInterval(intervalId);
+      intervalId = setInterval(nextImage, intervalMs);
+    }
+  }
+
+  function updateDuration(val) {
+    durationSec = parseInt(val);
+    document.getElementById("durationLabel").textContent = val;
+  }
+
+  function autoAdjust() {
+    fetch("{% url 'auto_photo_adjust' %}", {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    }).then(r => r.json()).then(data => {
+      alert(data.status);
+      location.reload();
+    });
+  }
+
+  function takePhoto() {
+    fetch("{% url 'take_photo_now' %}", {
+      method: "POST",
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    }).then(res => res.json()).then(data => {
+      alert(data.status || "Photo taken");
+      location.reload();
+    });
+  }
+
   function loadImage(src) {
     const img = new Image();
     img.onload = () => {
-      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const match = src.match(/photo_(\d{8}_\d{6})/);
+      if (match) {
+        const raw = match[1];
+        const date = new Date(
+          `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}T${raw.slice(9, 11)}:${raw.slice(11, 13)}:${raw.slice(13, 15)}`
+        );
+        const timestamp = `⏱ ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+        ctx.font = "18px monospace";
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0, 0, canvas.width, 30);
+        ctx.fillStyle = "white";
+        ctx.fillText(timestamp, 10, 22);
+      }
     };
     img.src = src;
   }
@@ -176,54 +241,37 @@
     if (!photos.length) return;
     index = (i + photos.length) % photos.length;
     loadImage(photos[index]);
-    document.querySelectorAll(".thumb-container img")
-      .forEach((el, idx) => el.classList.toggle("selected", idx===index));
+    document.querySelectorAll("#thumbnailBar img").forEach((img, i) => {
+      img.classList.toggle("selected", i === index);
+    });
   }
 
-  function nextImage() { showImage(index+1); }
-  function prevImage() { showImage(index-1); }
-  function jumpToIndex(i) { showImage(i); }
+  function nextImage() {
+    showImage(index + 1);
+  }
+
+  function prevImage() {
+    showImage(index - 1);
+  }
 
   function togglePlayPause() {
     playing = !playing;
-    document.getElementById("playPauseBtn").textContent =
-      playing ? "⏸ Pause" : "▶️ Play";
+    document.getElementById("playPauseBtn").textContent = playing ? "⏸ Pause" : "▶️ Play";
     if (playing) {
       intervalId = setInterval(nextImage, intervalMs);
-      stopTimeoutId = setTimeout(togglePlayPause, durationSec*1000);
+      stopTimeoutId = setTimeout(togglePlayPause, durationSec * 1000);
     } else {
       clearInterval(intervalId);
       clearTimeout(stopTimeoutId);
     }
   }
 
-  function scrollThumbnails(px) {
-    thumbBar.scrollBy({ left: px, behavior: 'smooth' });
+  function jumpToIndex(i) {
+    showImage(i);
   }
 
-  function toggleSettings() {
-    const pop = document.getElementById("settingsPopup");
-    pop.style.display = pop.style.display==='block'?'none':'block';
+  if (photos.length > 0) {
+    showImage(0);
   }
-  function updateSpeed(v) {
-    intervalMs = +v; document.getElementById("speedLabel").textContent = v;
-    if (playing) { clearInterval(intervalId); intervalId = setInterval(nextImage, intervalMs); }
-  }
-  function updateDuration(v) {
-    durationSec = +v; document.getElementById("durationLabel").textContent = v;
-  }
-
-  function autoAdjust(){
-    fetch("{% url 'auto_photo_adjust' %}",{
-      method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}
-    }).then(r=>r.json()).then(d=>alert(d.status)).finally(()=>location.reload());
-  }
-  function takePhoto(){
-    fetch("{% url 'take_photo_now' %}",{
-      method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}
-    }).then(r=>r.json()).then(d=>alert(d.status||'Photo taken')).finally(()=>location.reload());
-  }
-
-  if (photos.length) showImage(0);
 </script>
 {% endblock %}

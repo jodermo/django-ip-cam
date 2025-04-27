@@ -345,7 +345,7 @@ def photo_gallery(request):
         for fname in sorted(os.listdir(PHOTO_DIR)):
             if fname.lower().endswith((".jpg", ".jpeg", ".png")):
                 photos.append(f"/media/photos/{fname}")
-    settings_obj = get_camera_settings()
+    settings_obj = get_camera_settings_safe()  
     return render(request, "cameraapp/gallery.html", {
         "photos": photos,
         "interval": settings_obj.interval_ms if settings_obj else 3000,
