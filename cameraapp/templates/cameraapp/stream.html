@@ -75,8 +75,7 @@
 </style>
 
 <div id="streamContainer">
-  <img id="streamImage" alt="Live Stream" src="{% url 'video_feed' %}">
-
+  <img src="{% url 'video_feed' %}" />
   <div class="overlay-controls">
     <p><strong>User:</strong> {{ request.user.username }}</p>
     <p><strong>Viewers:</strong> {{ viewer_count }}</p>
@@ -214,10 +213,13 @@ document.getElementById("manual-restart-form").addEventListener("submit", functi
       headers: { "X-CSRFToken": "{{ csrf_token }}" }
     }).then(() => updateRecordingStatus());
   }
-
+  function updateStreamImage() {
+    const img = document.getElementById("streamImage");
+    img.src = "{% url 'video_feed' %}?t=" + new Date().getTime();
+  }
   setInterval(updateRecordingStatus, 3000);
   updateRecordingStatus();
-
+  setInterval(updateStreamImage, 100);
 
 </script>
 {% endblock %}
