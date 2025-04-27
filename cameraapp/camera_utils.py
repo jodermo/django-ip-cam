@@ -1,6 +1,7 @@
 # cameraapp/camera_utils.py
 import logging
 import time
+import threading
 import cv2
 from django.apps import apps
 from .globals import camera_lock, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
@@ -200,3 +201,28 @@ def force_restart_livestream():
         livestream_job.start()
         print("[LIVE] Livestream restarted.")
         return True
+    
+
+
+
+def start_camera_watchdog(interval_sec=10):
+    """
+    Überwacht kontinuierlich, ob die Kamera noch funktioniert.
+    Startet oder repariert die Verbindung bei Ausfall.
+    """
+    def watchdog_loop():
+        print("[WATCHDOG] Kamera-Watchdog gestartet.")
+        while True:
+            time.sleep(interval_sec)
+
+            if not livestream_job or not livestream_job.running:
+                print("[WATCHDOG] Livestream nicht aktiv. Starte neu...")
+                force_restart_livestream()
+                continue
+
+            frame = livestream_job.get_frame()
+            if frame is None:
+                print("[WATCHDOG] Kein Frame erkannt. Erzwinge Neustart.")
+                force_restart_livestream()
+
+    threading.Thread(target=watchdog_loop, daemon=True).start()
