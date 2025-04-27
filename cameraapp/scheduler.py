@@ -9,33 +9,58 @@ from django.conf import settings
 from django.db import connections
 
 from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
-from .livestream_job import LiveStreamJob
-from .globals import latest_frame_lock, latest_frame
+from .globals import latest_frame_lock, latest_frame, livestream_job, camera_lock
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
 
+
 def take_photo():
     """
     Capture a photo from the shared livestream frame.
-    If unavailable, skip instead of opening a new capture.
+    If unavailable and livestream is not running, use fallback camera snap.
     """
-    with latest_frame_lock:
-        if latest_frame is not None:
-            frame = latest_frame.copy()
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
-            if cv2.imwrite(filepath, frame):
-                print(f"[PHOTO] Saved from stream: {filepath}")
-                return True
-            else:
-                print("[PHOTO] Failed to save shared frame.")
-                return False
+    # Try to save frame from livestream if available
+    if livestream_job and livestream_job.running:
+        with latest_frame_lock:
+            if latest_frame is not None:
+                frame = latest_frame.copy()
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
+                if cv2.imwrite(filepath, frame):
+                    print(f"[PHOTO] Saved from stream: {filepath}")
+                    return True
+                else:
+                    print("[PHOTO] Failed to save shared frame.")
+                    return False
 
-    print("[PHOTO] No live frame available, skipping fallback.")
-    return False
+    # Fallback: capture directly from camera if livestream is not running
+    print("[PHOTO] Livestream not running or no frame available. Trying direct capture...")
+    with camera_lock:
+        settings = get_camera_settings()
+        cap = try_open_camera(0, retries=3, delay=1.0)
+        if not cap or not cap.isOpened():
+            print("[PHOTO] Camera not available for fallback.")
+            return False
 
+        apply_cv_settings(cap, settings, mode="photo")
+        time.sleep(0.3)
+        ret, frame = cap.read()
+        cap.release()
+
+        if not ret or frame is None:
+            print("[PHOTO] Failed to capture fallback frame.")
+            return False
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
+        if cv2.imwrite(filepath, frame):
+            print(f"[PHOTO] Saved from fallback: {filepath}")
+            return True
+        else:
+            print("[PHOTO] Failed to save fallback frame.")
+            return False
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
     """
