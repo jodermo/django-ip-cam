@@ -638,6 +638,8 @@ def single_frame(request):
     from django.http import HttpResponse
     from .globals import app_globals
     import cv2
+    if not app_globals.camera:
+        init_camera()
 
     with app_globals.latest_frame_lock:
         frame = app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
@@ -653,6 +655,7 @@ def single_frame(request):
 
 
 def resume_livestream_safe():
+    
     try:
         print("[PHOTO] resume_livestream_safe: Thread started")
         resume_livestream()
