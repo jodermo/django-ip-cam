@@ -8,29 +8,25 @@ import cv2
 from typing import Callable
 
 from .camera_utils import apply_cv_settings, get_camera_settings
-from .livestream_job import LiveStreamJob
 from .globals import app_globals
+from .livestream_job import LiveStreamJob
+from .camera_utils import safe_restart_camera_stream, update_latest_frame
 
 logger = logging.getLogger(__name__)
 
 
-def safe_restart_livestream():
+def ensure_livestream_running():
     """
-    Stop and restart the livestream job safely using CameraManager.
+    Starts the livestream if not already running.
     """
     if app_globals.livestream_job and getattr(app_globals.livestream_job, 'running', False):
-        logger.info("[RECORDING] Stopping existing livestream...")
-        try:
-            app_globals.livestream_job.stop()
-            app_globals.livestream_job.join(timeout=2.0)
-        except Exception as e:
-            logger.warning(f"[RECORDING] Error stopping livestream: {e}")
+        logger.debug("[RecordingJob] Livestream already running")
+        return
 
-    time.sleep(1.0)
-
+    logger.info("[RecordingJob] Starting livestream before recording...")
     cam = app_globals.camera
     if not cam or not cam.cap or not cam.cap.isOpened():
-        logger.error("[RECORDING] Cannot restart livestream – camera.cap is invalid")
+        logger.error("[RecordingJob] Cannot start livestream – camera.cap is invalid")
         return
 
     settings = get_camera_settings()
@@ -38,7 +34,7 @@ def safe_restart_livestream():
         try:
             apply_cv_settings(cam, settings, mode="video")
         except Exception as e:
-            logger.warning(f"[RECORDING] Failed to apply settings: {e}")
+            logger.warning(f"[RecordingJob] Failed to apply video settings: {e}")
 
     job = LiveStreamJob(
         camera_source=0,
@@ -47,8 +43,7 @@ def safe_restart_livestream():
     )
     job.start()
     app_globals.livestream_job = job
-    logger.info("[RECORDING] Livestream restarted successfully")
-
+    logger.info("[RecordingJob] Livestream started successfully")
 
 
 class RecordingJob:
@@ -75,6 +70,7 @@ class RecordingJob:
 
     def start(self) -> None:
         logger.info(f"[RecordingJob] Starting: {self.filepath}")
+        ensure_livestream_running()
         self.active = True
         self.thread.start()
 
@@ -121,7 +117,6 @@ class RecordingJob:
         out.release()
         self.active = False
         logger.info(f"[RecordingJob] Finished: {self.frame_count} frames to {self.filepath}")
-        safe_restart_livestream()
 
     def stop(self) -> None:
         if not self.active:
