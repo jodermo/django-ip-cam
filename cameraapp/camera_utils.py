@@ -183,7 +183,7 @@ def force_restart_livestream():
     logger.info("force_restart_livestream called")
     return safe_restart_camera_stream(
         camera_source=os.getenv("CAMERA_URL", 0),
-        frame_callback=lambda f: setattr(__import__('.globals', fromlist=['']), 'latest_frame', f.copy())
+        frame_callback=update_latest_frame
     )
 
 
