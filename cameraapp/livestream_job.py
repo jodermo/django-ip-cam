@@ -84,6 +84,7 @@ class LiveStreamJob:
             logger.info("LiveStreamJob thread joined")
 
     def _run(self) -> None:
+        print("[LiveStreamJob] Frame captured and callback invoked.")
         lazy_imports()
         self.capture = self._connect_with_retries()
         if not self.capture:

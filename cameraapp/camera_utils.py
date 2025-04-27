@@ -213,9 +213,11 @@ def update_livestream_job(new_job):
 
 
 def update_latest_frame(f):
-    from .globals import latest_frame, latest_frame_lock
-    with latest_frame_lock:
-        globals()["latest_frame"] = f.copy()
+    print("[DEBUG] update_latest_frame called.")
+    import cameraapp.globals as app_globals
+    with app_globals.latest_frame_lock:
+        app_globals.latest_frame = f.copy()
+
 
 def force_device_reset(device_path="/dev/video0"):
     """
