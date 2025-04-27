@@ -10,13 +10,13 @@ from typing import Callable
 from .camera_utils import apply_cv_settings, get_camera_settings
 from .livestream_job import LiveStreamJob
 from . import globals as app_globals
-from .globals import camera
 
 logger = logging.getLogger(__name__)
 
+
 def safe_restart_livestream():
     """
-    Stop any running livestream and restart it using the shared camera manager.
+    Stop and restart the livestream job safely using CameraManager.
     """
     if app_globals.livestream_job and getattr(app_globals.livestream_job, 'running', False):
         logger.info("[RECORDING] Stopping existing livestream...")
@@ -28,26 +28,27 @@ def safe_restart_livestream():
 
     time.sleep(1.0)
 
-    if not camera or not camera.is_available():
-        logger.error("[RECORDING] Camera not ready for livestream restart")
+    cam = app_globals.camera
+    if not cam or not cam.cap or not cam.cap.isOpened():
+        logger.error("[RECORDING] Cannot restart livestream – camera.cap is invalid")
         return
 
     settings = get_camera_settings()
     if settings:
         try:
-            apply_cv_settings(camera, settings, mode="video")
+            apply_cv_settings(cam, settings, mode="video")
         except Exception as e:
             logger.warning(f"[RECORDING] Failed to apply settings: {e}")
 
-    # Restart the livestream job
     job = LiveStreamJob(
         camera_source=0,
         frame_callback=lambda f: setattr(app_globals, 'latest_frame', f.copy()),
-        shared_capture=camera.cap
+        shared_capture=cam.cap
     )
     job.start()
     app_globals.livestream_job = job
     logger.info("[RECORDING] Livestream restarted successfully")
+
 
 
 class RecordingJob:

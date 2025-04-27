@@ -5,7 +5,7 @@ import time
 import logging
 from typing import Callable, Optional, Union, Any
 
-from .globals import livestream_lock, camera
+from . import globals as app_globals
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +43,8 @@ class LiveStreamJob:
 
         if shared_capture is not None:
             self.capture = shared_capture
-        elif camera and getattr(camera, "cap", None) and camera.cap.isOpened():
-            self.capture = camera.cap
+        elif app_globals.camera and getattr(app_globals.camera, "cap", None) and app_globals.camera.cap.isOpened():
+            self.capture = app_globals.camera.cap
         else:
             logger.error("LiveStreamJob initialized without valid capture source.")
             self.capture = None
@@ -59,7 +59,7 @@ class LiveStreamJob:
         logger.info("LiveStreamJob started")
 
     def stop(self) -> None:
-        with livestream_lock:
+        with app_globals.livestream_lock:
             self.running = False
             if self.capture and not self.shared_capture:
                 try:
@@ -106,7 +106,7 @@ class LiveStreamJob:
                     except Exception as cb_err:
                         logger.warning(f"Frame callback error: {cb_err}")
 
-                with livestream_lock:
+                with app_globals.livestream_lock:
                     self.latest_frame = frame.copy()
 
                 time.sleep(0.03)
@@ -127,11 +127,11 @@ class LiveStreamJob:
                 settings = get_camera_settings()
                 if settings:
                     try:
-                        apply_cv_settings(camera.cap, settings, mode="video")
+                        apply_cv_settings(app_globals.camera.cap, settings, mode="video")
                         logger.info("Camera settings applied successfully")
                     except Exception as e:
                         logger.warning(f"Failed to apply camera settings: {e}")
-                return camera.cap
+                return app_globals.camera.cap
 
             logger.warning(f"Camera not ready, retrying in {delay} seconds")
             time.sleep(delay)
@@ -147,7 +147,7 @@ class LiveStreamJob:
             logger.error(f"force_device_reset failed: {e}")
 
         if self.is_camera_ready():
-            return camera.cap
+            return app_globals.camera.cap
         return None
 
 
@@ -161,9 +161,9 @@ class LiveStreamJob:
                 self.capture = None
 
     def get_frame(self) -> Optional[Any]:
-        with livestream_lock:
+        with app_globals.livestream_lock:
             return self.latest_frame.copy() if self.latest_frame is not None else None
         
     def is_camera_ready(self) -> bool:
-        return hasattr(camera, "cap") and camera.cap and camera.cap.isOpened()
+        return hasattr(app_globals.camera, "cap") and app_globals.camera.cap and app_globals.camera.cap.isOpened()
 

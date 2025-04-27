@@ -10,9 +10,8 @@ from django.db import connections
 import logging
 
 from .camera_utils import apply_cv_settings, get_camera_settings, force_restart_livestream
-from .globals import latest_frame_lock, latest_frame, livestream_job, camera_lock, camera
+from . import globals as app_globals
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
@@ -24,13 +23,14 @@ def take_photo():
     Capture a photo from the livestream, or fallback directly from CameraManager.
     Returns file path on success, None on failure.
     """
+    global app_globals
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
 
-    if livestream_job and livestream_job.running:
-        with latest_frame_lock:
-            if latest_frame is not None:
-                frame = latest_frame.copy()
+    if app_globals.livestream_job and app_globals.livestream_job.running:
+        with app_globals.latest_frame_lock:
+            if app_globals.latest_frame is not None:
+                frame = app_globals.latest_frame.copy()
                 if cv2.imwrite(filepath, frame):
                     logger.info(f"[PHOTO] Saved from stream: {filepath}")
                     return filepath
@@ -42,17 +42,17 @@ def take_photo():
 
     logger.info("[PHOTO] Livestream not available. Trying fallback using CameraManager...")
 
-    with camera_lock:
-        if not camera or not camera.is_available():
+    with app_globals.camera_lock:
+        if not app_globals.camera or not app_globals.camera.is_available():
             logger.warning("[PHOTO] CameraManager not ready or unavailable.")
             return None
 
         settings = get_camera_settings()
         if settings:
-            apply_cv_settings(camera, settings, mode="photo")
+            apply_cv_settings(app_globals.camera, settings, mode="photo")
 
         # Capture frame using CameraManager
-        frame = camera.get_frame()
+        frame = app_globals.camera.get_frame()
 
         if frame is None:
             logger.error("[PHOTO] Failed to capture frame from fallback.")

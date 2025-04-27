@@ -9,9 +9,7 @@ from django.apps import apps
 from cameraapp.camera_manager import CameraManager
 from cameraapp.livestream_job import LiveStreamJob
 from . import globals as app_globals
-camera = app_globals.camera
-livestream_job = app_globals.livestream_job
-camera_lock = app_globals.camera_lock
+
 
 logger = logging.getLogger(__name__)
 
@@ -104,37 +102,36 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
     Restart the livestream job using the *single* CameraManager instance.
     Returns the new LiveStreamJob, or None on failure.
     """
-    global livestream_job, camera
-    if not camera:
+    global app_globals
+    if not app_globals.camera:
         logger.error("camera is None after initialization")
-    elif not camera.cap:
+    elif not app_globals.camera.cap:
         logger.error("CameraManager.cap is None after initialization")
-    elif not camera.cap.isOpened():
+    elif not app_globals.camera.cap.isOpened():
         logger.error("CameraManager.cap is not opened")
     else:
         logger.info("CameraManager.cap is valid and opened")
-    with camera_lock:
+    with app_globals.camera_lock:
         # 1) Stop existing livestream
-        if livestream_job and livestream_job.running:
+        if app_globals.livestream_job and app_globals.livestream_job.running:
             try:
-                livestream_job.stop()
-                livestream_job.join(timeout=2.0)
+                app_globals.livestream_job.stop()
+                app_globals.livestream_job.join(timeout=2.0)
                 logger.info("Stopped previous livestream job")
             except Exception as e:
                 logger.warning(f"Error stopping livestream_job: {e}")
-            livestream_job = None
+            app_globals.livestream_job = None
 
         # 2) Ensure camera is alive (reopen if needed)
-        if camera_source and (not camera or not camera.is_available()):
+        if camera_source and (not app_globals.camera or not app_globals.camera.is_available()):
             logger.info(f"CameraManager is being reinitialized with source: {camera_source}")
             try:
-                camera = CameraManager(source=camera_source)
+                app_globals.camera = CameraManager(source=camera_source)
 
-                # >>>>>> FIX: Kamera global setzen
-                app_globals.camera = camera
-                globals()["camera"] = camera
 
-                if not camera.is_available():
+                globals()["camera"] = app_globals.camera
+
+                if not app_globals.camera.is_available():
                     logger.error("Newly initialized CameraManager is not available")
                     return None
             except Exception as e:
@@ -148,7 +145,7 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
         if settings:
             try:
                 from .camera_utils import apply_cv_settings
-                apply_cv_settings(camera, settings, mode="video")
+                apply_cv_settings(app_globals.camera, settings, mode="video")
                 logger.info("Re-applied CV settings")
             except Exception as e:
                 logger.warning(f"Failed to apply camera settings: {e}")
@@ -158,14 +155,14 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
             new_job = LiveStreamJob(
                 camera_source=None,        # unused when shared_capture is given
                 frame_callback=frame_callback,
-                shared_capture=(camera.cap if camera else None)
+                shared_capture=(app_globals.camera.cap if app_globals.camera else None)
             )
             new_job.start()
 
             time.sleep(0.5)
             if not new_job.running:
                 raise RuntimeError("Livestream job did not start")
-            livestream_job = new_job
+            app_globals.livestream_job = new_job
             logger.info("Livestream restarted successfully")
             return new_job
 
@@ -185,15 +182,15 @@ def force_restart_livestream():
 
 
 def release_and_reset_camera():
-    global livestream_job
+    global app_globals
     try:
-        if livestream_job and livestream_job.capture:
-            livestream_job.capture.release()
-            livestream_job.capture = None
-        if livestream_job:
-            livestream_job.stop()
-            livestream_job.join(timeout=2)
-            livestream_job = None
+        if app_globals.livestream_job and app_globals.livestream_job.capture:
+            app_globals.livestream_job.capture.release()
+            app_globals.livestream_job.capture = None
+        if app_globals.livestream_job:
+            app_globals.livestream_job.stop()
+            app_globals.livestream_job.join(timeout=2)
+            app_globals.livestream_job = None
         force_restart_livestream()
         gc.collect()
         time.sleep(1)
@@ -202,8 +199,8 @@ def release_and_reset_camera():
 
 
 def update_livestream_job(new_job):
-    global livestream_job
-    livestream_job = new_job
+    global app_globals
+    app_globals.livestream_job = new_job
     globals()["livestream_job"] = new_job
 
 
