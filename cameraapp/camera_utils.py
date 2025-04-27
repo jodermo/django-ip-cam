@@ -59,7 +59,7 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     else:
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
         print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = MANUAL")
-        time.sleep(0.1)  # some cameras require this pause after switching mode
+        time.sleep(0.1)
 
     def apply_param(name, min_valid=-1.0, max_valid=100.0):
         try:
@@ -75,12 +75,14 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
             print(f"[WARNING] Invalid value for {prefix}{name}")
             return
 
-        if value < 0:
+        if name != "exposure" and value < 0:
             print(f"[CAMERA_CORE] {name} disabled (value={value})")
             return
+
         if name == "exposure" and exposure_mode == "auto":
             print("[SKIP] Exposure ignored in auto mode.")
             return
+
         cap_prop = getattr(cv2, f"CAP_PROP_{name.upper()}", None)
         if cap_prop is None:
             print(f"[WARNING] Unknown OpenCV property: {name}")
@@ -90,22 +92,20 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
             print(f"[WARNING] {name} out of valid range ({value}) – ignored.")
             return
 
+        print(f"[DEBUG] Setting {name} = {value} on CAP_PROP_{name.upper()}")
         ok = cap.set(cap_prop, value)
         actual = cap.get(cap_prop)
         print(f"[CAMERA_CORE] {mode.upper()} Set {name} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
 
-    # Apply camera parameters
     apply_param("brightness", 0.0, 255.0)
     apply_param("contrast", 0.0, 255.0)
     apply_param("saturation", 0.0, 255.0)
     apply_param("gain", 0.0, 10.0)
 
     if exposure_mode == "manual":
-        # Valid exposure range only applied when in manual mode
         apply_param("exposure", -13.0, -1.0)
     else:
         print("[SKIP] Exposure setting ignored in auto exposure mode.")
-
 
 
 
