@@ -7,6 +7,9 @@ import threading
 from cameraapp.models import CameraSettings
 from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe
 from .globals import camera_lock, camera_capture
+# camera_instance.py
+from .camera_manager import CameraManager
+
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -16,6 +19,7 @@ CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
 camera_instance = None 
 
+camera = CameraManager()
 
 def init_camera():
     global camera_capture

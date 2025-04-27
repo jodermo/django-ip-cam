@@ -23,12 +23,13 @@ from django.apps import apps
 from django.db import connection
 from django.contrib.auth import logout
 
+
 from .models import CameraSettings
 from .camera_core import (
     init_camera, reset_to_default,
     apply_photo_settings, apply_auto_settings, auto_adjust_from_frame, try_open_camera_safe,
     try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream, get_camera_settings_safe,
-    release_and_reset_camera
+    release_and_reset_camera, camera
 )
 from .camera_utils import safe_restart_camera_stream
 from .globals import (
@@ -138,11 +139,13 @@ def generate_frames():
         time.sleep(0.03)
 
 
+
+
 @login_required
 def video_feed(request):
-    if not livestream_job or not livestream_job.running:
-        print("[VIDEO_FEED] Livestream not active. Restarting...")
-        force_restart_livestream()
+    frame = camera.get_frame()
+    if frame is None:
+        return HttpResponse("No frame", status=503)
 
     return StreamingHttpResponse(generate_frames(), content_type="multipart/x-mixed-replace; boundary=frame")
 
