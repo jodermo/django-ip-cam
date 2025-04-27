@@ -124,55 +124,57 @@ def try_open_camera(camera_source, retries=3, delay=1.0):
     print("[DEBUG] All attempts failed. Returning None.")
     return None
 
-
 def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, retries: int = 3, delay: float = 2.0):
     """
     Safely restart the livestream:
     1. Stop and join any existing job
-    2. Reopen the camera with retries
-    3. Apply stored camera settings
-    4. Launch and return a new LiveStreamJob
+    2. Wait for camera availability
+    3. Reopen the camera with retries
+    4. Apply stored camera settings
+    5. Launch and return a new LiveStreamJob
 
     Returns:
         LiveStreamJob or None on failure
     """
-    from .livestream_job import LiveStreamJob
+    import os
+    import cv2
+    import time
     import gc
+    from .livestream_job import LiveStreamJob
+    from .camera_core import camera_lock, camera_instance, try_open_camera
+    from .camera_utils import get_camera_settings, apply_cv_settings, force_device_reset
+    import logging
 
+    logger = logging.getLogger(__name__)
     logger.info("[RESTART] Starting safe_restart_camera_stream...")
+
+    def wait_until_camera_available(device_index=0, max_attempts=6, delay=1.0):
+        for attempt in range(max_attempts):
+            cap = cv2.VideoCapture(device_index)
+            if cap.isOpened():
+                cap.release()
+                logger.info(f"[RESTART] /dev/video{device_index} ist wieder verfügbar.")
+                return True
+            logger.info(f"[RESTART] Warten auf /dev/video{device_index} – Versuch {attempt + 1}/{max_attempts}")
+            time.sleep(delay)
+        return False
+
     with camera_lock:
+        # Stop and release current camera
         if camera_instance and camera_instance.isOpened():
             camera_instance.release()
-            print("[RELEASE] Camera released. Verifiziere Freigabe...")
-            for i in range(5):
-                if os.path.exists("/dev/video0"):
-                    try:
-                        test_cap = cv2.VideoCapture(0)
-                        if test_cap.isOpened():
-                            test_cap.release()
-                            print("[RELEASE] Kamera testweise geöffnet → Freigabe erfolgreich.")
-                            break
-                    except:
-                        pass
-                print(f"[RELEASE] Versuch {i+1} – Kamera noch blockiert...")
-                time.sleep(1.0)
-            else:
-                print("[RELEASE] Kamera nach 5 Versuchen nicht freigegeben. Fortfahren mit Risiko.")
-
-            print("[RELEASE] Camera released.")
+            logger.info("[RESTART] Camera released.")
 
             try:
                 force_device_reset("/dev/video0")
             except Exception as e:
-                print(f"[RELEASE] Device reset failed: {e}")
+                logger.warning(f"[RESTART] Device reset failed: {e}")
 
-            import gc
             gc.collect()
-            time.sleep(2.5)
-            
-        # 1) Stop existing livestream
+            time.sleep(1.5)
+
+        # Stop running stream job
         if livestream_job_ref and getattr(livestream_job_ref, 'running', False):
-            logger.info("[RESTART] Stopping existing livestream job...")
             try:
                 livestream_job_ref.stop()
                 livestream_job_ref.join(timeout=2.0)
@@ -180,13 +182,16 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
             except Exception as e:
                 logger.warning(f"[RESTART] Error stopping previous job: {e}")
 
-        # 2) Garbage collect and delay to fully release camera resources
-        logger.info("[RESTART] Running gc.collect() and waiting for device release...")
         gc.collect()
-        time.sleep(1.5)
+        time.sleep(1.0)
 
-        # 3) Attempt to open camera with retries
-        logger.info(f"[RESTART] Trying to open camera ({camera_url}) with {retries} retries...")
+        # Wait for device to become available
+        if not wait_until_camera_available(device_index=0, max_attempts=6, delay=1.0):
+            logger.error("[RESTART] Camera did not become available. Aborting.")
+            return None
+
+        # Try to open camera
+        logger.info("[RESTART] Attempting to open camera...")
         cap = try_open_camera(camera_url, retries=retries, delay=delay)
         if not cap or not cap.isOpened():
             logger.error("[RESTART] Camera not available after retries. Aborting restart.")
@@ -194,7 +199,7 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
 
         logger.info("[RESTART] Camera opened successfully.")
 
-        # 4) Apply stored camera settings
+        # Apply previous settings
         settings = get_camera_settings()
         if settings:
             try:
@@ -203,11 +208,10 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
             except Exception as e:
                 logger.warning(f"[RESTART] Failed to apply camera settings: {e}")
         else:
-            logger.warning("[RESTART] No CameraSettings found – using defaults.")
+            logger.warning("[RESTART] No camera settings found.")
 
-        # 5) Create and start new LiveStreamJob
+        # Create and start job
         try:
-            logger.info("[RESTART] Creating new LiveStreamJob instance...")
             job = LiveStreamJob(
                 camera_source=camera_url,
                 frame_callback=frame_callback,
@@ -227,7 +231,6 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
             logger.error(f"[RESTART] Failed to start livestream job: {e}")
             cap.release()
             return None
-
 
 
 

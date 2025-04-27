@@ -717,3 +717,17 @@ def manual_restart_camera(request):
     globals()["livestream_job"] = livestream_job
 
     return redirect("stream_page")
+
+
+def wait_until_camera_available(device_index=0, max_attempts=5, delay=1.0):
+    for attempt in range(max_attempts):
+        cap = cv2.VideoCapture(device_index)
+        if cap.isOpened():
+            cap.release()
+            print(f"[CAMERA_UTIL] /dev/video{device_index} ist verfügbar.")
+            return True
+        else:
+            print(f"[CAMERA_UTIL] Warten auf /dev/video{device_index}... Versuch {attempt+1}/{max_attempts}")
+            time.sleep(delay)
+    print(f"[CAMERA_UTIL] /dev/video{device_index} NICHT verfügbar nach {max_attempts} Versuchen.")
+    return False
