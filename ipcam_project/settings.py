@@ -43,6 +43,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "cameraapp.middleware.CameraInitMiddleware",
 ]
 
 ROOT_URLCONF = "ipcam_project.urls"
