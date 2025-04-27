@@ -9,7 +9,6 @@ import fcntl
 import os
 import gc
 from django.apps import apps
-from .livestream_job import LiveStreamJob
 from .globals import camera_lock, camera_instance, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
 
 
