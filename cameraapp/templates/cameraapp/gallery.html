@@ -76,8 +76,8 @@
   #thumbnailBar {
     position: absolute;
     bottom: 10px;
-    left: 10px;
-    right: 10px;
+    left: 50px;
+    right: 50px;
     z-index: 15;
     display: flex;
     gap: 8px;
@@ -86,6 +86,11 @@
     background: rgba(0, 0, 0, 0.6);
     padding: 8px;
     border-radius: 6px;
+    scrollbar-width: none;
+  }
+
+  #thumbnailBar::-webkit-scrollbar {
+    display: none;
   }
 
   #thumbnailBar img {
@@ -101,6 +106,32 @@
 
   #thumbnailBar img.selected {
     outline: 3px solid yellow;
+  }
+
+  .thumb-nav-btn {
+    position: absolute;
+    bottom: 16px;
+    z-index: 16;
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    color: white;
+    font-size: 1.5em;
+    padding: 0.3em 0.6em;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+  }
+
+  .thumb-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .thumb-nav-btn.left {
+    left: 10px;
+  }
+
+  .thumb-nav-btn.right {
+    right: 10px;
   }
 </style>
 
@@ -161,6 +192,9 @@
       <img src="{{ photo }}" width="80" onclick="jumpToIndex({{ forloop.counter0 }})">
     {% endfor %}
   </div>
+
+  <button id="thumbPrevBtn" class="thumb-nav-btn left">⏪</button>
+  <button id="thumbNextBtn" class="thumb-nav-btn right">⏩</button>
 </div>
 
 <script>
@@ -273,5 +307,31 @@
   if (photos.length > 0) {
     showImage(0);
   }
+
+  // Thumbnail bar scrolling
+  const thumbBar = document.getElementById("thumbnailBar");
+  const scrollAmount = 100;
+  let scrollTimer = null;
+
+  function scrollThumbnails(direction) {
+    thumbBar.scrollBy({ left: direction * scrollAmount, behavior: "smooth" });
+  }
+
+  function startContinuousScroll(direction) {
+    scrollTimer = setInterval(() => scrollThumbnails(direction), 100);
+  }
+
+  function stopContinuousScroll() {
+    clearInterval(scrollTimer);
+  }
+
+  document.getElementById("thumbPrevBtn").addEventListener("mousedown", () => startContinuousScroll(-1));
+  document.getElementById("thumbNextBtn").addEventListener("mousedown", () => startContinuousScroll(1));
+  document.getElementById("thumbPrevBtn").addEventListener("mouseup", stopContinuousScroll);
+  document.getElementById("thumbNextBtn").addEventListener("mouseup", stopContinuousScroll);
+  document.getElementById("thumbPrevBtn").addEventListener("mouseleave", stopContinuousScroll);
+  document.getElementById("thumbNextBtn").addEventListener("mouseleave", stopContinuousScroll);
+  document.getElementById("thumbPrevBtn").addEventListener("click", () => scrollThumbnails(-1));
+  document.getElementById("thumbNextBtn").addEventListener("click", () => scrollThumbnails(1));
 </script>
 {% endblock %}
