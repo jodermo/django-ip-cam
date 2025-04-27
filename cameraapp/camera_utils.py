@@ -308,11 +308,33 @@ def force_device_reset(device="/dev/video0"):
 
 
 def release_and_reset_camera():
-    if camera_instance and camera_instance.isOpened():
-        camera_instance.release()
-        print("[RELEASE] Camera released.")
-        time.sleep(1.0)
+    from .globals import camera_instance, camera_capture, livestream_job
+    try:
+        if livestream_job and livestream_job.capture:
+            livestream_job.capture.release()
+            livestream_job.capture = None
+            print("[RELEASE] livestream_job.capture released")
 
-    force_device_reset("/dev/video0")
-    gc.collect()
-    time.sleep(1.5)
+        if camera_instance and camera_instance.isOpened():
+            camera_instance.release()
+            print("[RELEASE] camera_instance released")
+
+        camera_instance = None
+        camera_capture = None
+
+    except Exception as e:
+        print(f"[RELEASE] Error during full camera release: {e}")
+    wait_for_camera_device()
+
+
+def wait_for_camera_device(path="/dev/video0", timeout=5):
+    for i in range(timeout):
+        if os.path.exists(path):
+            cap = cv2.VideoCapture(path)
+            if cap.isOpened():
+                cap.release()
+                print(f"[WAIT] Camera device {path} is available")
+                return True
+        print(f"[WAIT] Camera {path} still busy... attempt {i+1}")
+        time.sleep(1)
+    return False
