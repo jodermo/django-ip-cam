@@ -10,7 +10,7 @@ from django.db import connections
 import logging
 
 from .camera_utils import apply_cv_settings, get_camera_settings, force_restart_livestream
-from . import globals as app_globals
+from .globals import app_globals
 
 logger = logging.getLogger(__name__)
 

@@ -33,7 +33,7 @@ from .camera_core import (
     release_and_reset_camera
 )
 from .camera_utils import safe_restart_camera_stream, update_latest_frame
-from . import globals as app_globals
+from .globals import app_globals
 from .scheduler import take_photo 
 
 

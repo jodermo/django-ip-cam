@@ -5,7 +5,7 @@ import time
 import logging
 from typing import Callable, Optional, Union, Any
 
-from . import globals as app_globals
+from .globals import app_globals
 
 logger = logging.getLogger(__name__)
 

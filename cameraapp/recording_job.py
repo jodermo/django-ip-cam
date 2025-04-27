@@ -9,7 +9,7 @@ from typing import Callable
 
 from .camera_utils import apply_cv_settings, get_camera_settings
 from .livestream_job import LiveStreamJob
-from . import globals as app_globals
+from .globals import app_globals
 
 logger = logging.getLogger(__name__)
 

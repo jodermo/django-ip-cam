@@ -8,7 +8,7 @@ import subprocess
 from django.apps import apps
 from cameraapp.camera_manager import CameraManager
 from cameraapp.livestream_job import LiveStreamJob
-from . import globals as app_globals
+from .globals import app_globals
 
 
 logger = logging.getLogger(__name__)
