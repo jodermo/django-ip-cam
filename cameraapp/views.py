@@ -637,6 +637,23 @@ def resume_livestream():
 
 
 
+@csrf_exempt
+def single_frame(request):
+    from django.http import HttpResponse
+    from .globals import app_globals
+    import cv2
+
+    with app_globals.latest_frame_lock:
+        frame = app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
+
+    if frame is None:
+        return HttpResponse(status=204)
+
+    ret, buffer = cv2.imencode(".jpg", frame)
+    if not ret:
+        return HttpResponse(status=500)
+
+    return HttpResponse(buffer.tobytes(), content_type="image/jpeg")
 
 
 def resume_livestream_safe():
