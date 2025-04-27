@@ -147,12 +147,8 @@ class LiveStreamJob:
             logger.error(f"force_device_reset failed: {e}")
 
         if self.is_camera_ready():
-            logger.info("Camera ready after forced reset.")
             return camera.cap
-
-        logger.error("Camera still not available after forced reset.")
         return None
-
 
 
     def _cleanup(self) -> None:

@@ -4,7 +4,7 @@ import time
 import os
 import gc
 import cv2
-
+import subprocess
 from django.apps import apps
 from cameraapp.camera_manager import CameraManager
 from cameraapp.livestream_job import LiveStreamJob
@@ -211,3 +211,33 @@ def update_latest_frame(f):
     from .globals import latest_frame, latest_frame_lock
     with latest_frame_lock:
         globals()["latest_frame"] = f.copy()
+
+def force_device_reset(device_path="/dev/video0"):
+    """
+    Forcibly resets a USB camera by unbinding and rebinding the USB device.
+    Works only on Linux and requires root privileges.
+    """
+
+
+    # Get the USB bus/device path for the video device
+    try:
+        # Example: /dev/video0 -> 1-3 (bus-port)
+        result = subprocess.check_output(f"udevadm info --name={device_path} --query=all", shell=True)
+        for line in result.decode().splitlines():
+            if "ID_PATH=" in line:
+                path = line.strip().split("ID_PATH=")[-1]
+                usb_bus = path.split(":")[0]  # e.g. "pci-0000:00:14.0-usb-0:3"
+                usb_dev = usb_bus.split("-")[-1]
+                if usb_dev:
+                    unbind_path = f"/sys/bus/usb/drivers/usb/unbind"
+                    bind_path = f"/sys/bus/usb/drivers/usb/bind"
+                    logger.warning(f"Forcing USB reset of device {usb_dev}")
+                    with open(unbind_path, "w") as f:
+                        f.write(usb_dev)
+                    time.sleep(1)
+                    with open(bind_path, "w") as f:
+                        f.write(usb_dev)
+                    return
+        logger.error("Could not determine USB device ID from udevadm output")
+    except Exception as e:
+        logger.error(f"force_device_reset failed: {e}")
