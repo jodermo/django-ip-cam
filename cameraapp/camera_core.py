@@ -8,7 +8,7 @@ import glob
 from cameraapp.models import CameraSettings
 from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe, update_livestream_job
 from .globals import camera_lock, camera
-
+from .camera_manager import CameraManager
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -49,11 +49,14 @@ else:
 
 def init_camera():
     global camera
+    # If one exists, tear it down first
     if camera:
         camera.stop()
         time.sleep(1.0)
-    camera.start()
-    print("[CAMERA_CORE] Initializing CameraManager...")
+
+    # Create the one-and-only CameraManager:
+    camera = CameraManager(source=CAMERA_URL)
+    print("[CAMERA_CORE] CameraManager initialized")
 
 
 def reset_to_default():
