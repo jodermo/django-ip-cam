@@ -122,6 +122,8 @@ def safe_restart_camera_stream(frame_callback, camera_source=None):
             logger.info(f"CameraManager is being reinitialized with source: {camera_source}")
             try:
                 camera = CameraManager(source=camera_source)
+                app_globals.camera = camera
+                globals()["camera"] = camera
                 if not camera.is_available():
                     logger.error("Newly initialized CameraManager is not available")
                     return None

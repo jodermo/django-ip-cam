@@ -38,6 +38,8 @@ class CameraManager:
         self.thread = threading.Thread(target=self._capture_loop, daemon=True)
         self.thread.start()
         globals()["camera"] = self
+        import cameraapp.globals as app_globals
+        app_globals.camera = self
         
 
     def _open_camera(self):
