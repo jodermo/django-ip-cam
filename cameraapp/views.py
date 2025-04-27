@@ -62,10 +62,8 @@ livestream_job = None
 
 def get_livestream_job(camera_source, frame_callback=None):
     global livestream_job
-    if livestream_job is None:
-        from cameraapp.livestream_job import LiveStreamJob
-        livestream_job = LiveStreamJob(camera_source, frame_callback)
-    return livestream_job
+    from cameraapp.livestream_job import LiveStreamJob
+    livestream_job = LiveStreamJob(camera_source, frame_callback)
 
 
 def update_latest_frame(frame):
