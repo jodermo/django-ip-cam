@@ -508,11 +508,8 @@ def update_camera_settings(request):
 
             print("[DEBUG] Calling safe_restart_camera_stream...")
             livestream_job = safe_restart_camera_stream(
-                livestream_job_ref=livestream_job,
-                camera_url=CAMERA_URL,
                 frame_callback=lambda f: update_latest_frame(f),
-                retries=3,
-                delay=2.0
+                camera_source=CAMERA_URL
             )
             print(f"[DEBUG] Result from restart: {livestream_job}")
 
@@ -663,11 +660,8 @@ def manual_restart_camera(request):
     global livestream_job
 
     livestream_job = safe_restart_camera_stream(
-        livestream_job_ref=livestream_job,
-        camera_url=CAMERA_URL,
         frame_callback=lambda f: update_latest_frame(f),
-        retries=3,
-        delay=2.0
+        camera_source=CAMERA_URL
     )
 
     globals()["livestream_job"] = livestream_job
