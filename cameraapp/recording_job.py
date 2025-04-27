@@ -6,7 +6,7 @@ import cv2
 import os
 from .globals import livestream_job
 from .livestream_job import LiveStreamJob
-from .camera_core import try_open_camera, apply_cv_settings, get_camera_settings
+from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
 
 
 def safe_restart_livestream():

@@ -9,7 +9,7 @@ from django.db import connections
 from .globals import latest_frame, latest_frame_lock
 from .livestream_job import LiveStreamJob
 from .globals import livestream_job
-from .camera_core import try_open_camera, apply_cv_settings, get_camera_settings
+from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
 import numpy as np
 
 # Ensure photo directory exists
