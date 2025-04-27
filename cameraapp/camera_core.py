@@ -13,23 +13,8 @@ from .globals import camera_lock, camera
 from dotenv import load_dotenv
 load_dotenv()
 
-CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
-
-if CAMERA_URL_RAW == "0" and not os.path.exists("/dev/video0"):
-    fallback_device = find_working_camera_device()
-    CAMERA_URL = fallback_device if fallback_device else 0
-    print(f"[CAMERA_CORE] CAMERA_URL fallback resolved to: {CAMERA_URL}")
-else:
-    CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
 
-def init_camera():
-    global camera
-    if camera:
-        camera.stop()
-        time.sleep(1.0)
-    camera.start()
-    print("[CAMERA_CORE] Initializing CameraManager...")
 
 
 def find_working_camera_device():
@@ -49,6 +34,26 @@ def find_working_camera_device():
                 print(f"[CAMERA_CORE] Error testing {device} with backend {backend}: {e}")
     print("[CAMERA_CORE] No working camera found.")
     return None
+
+
+CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
+
+if CAMERA_URL_RAW == "0" and not os.path.exists("/dev/video0"):
+    fallback_device = find_working_camera_device()
+    CAMERA_URL = fallback_device if fallback_device else 0
+    print(f"[CAMERA_CORE] CAMERA_URL fallback resolved to: {CAMERA_URL}")
+else:
+    CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
+
+
+
+def init_camera():
+    global camera
+    if camera:
+        camera.stop()
+        time.sleep(1.0)
+    camera.start()
+    print("[CAMERA_CORE] Initializing CameraManager...")
 
 
 def reset_to_default():
