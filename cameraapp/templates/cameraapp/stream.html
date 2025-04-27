@@ -86,7 +86,7 @@
     <button onclick="stopRecording()">⏹ Stop</button>
     <button onclick="autoAdjust()">🌞 Auto Adjust</button>
     <button onclick="toggleSettings()">⚙️ Settings</button>
-    <form method="post" action="{% url 'reset_camera' %}" style="display:inline;">
+    <form method="post" action="{% url 'reset_camera' %}" style="display:inline;"  onsubmit="return applySettings();">
       {% csrf_token %}
       <button type="submit">🔄 Reset Camera</button>
     </form>
@@ -94,7 +94,7 @@
   </div>
 
   <div id="settingsPopup" class="settings-popup">
-    <form method="POST" action="{% url 'update_camera_settings' %}">
+    <form method="POST" action="{% url 'update_camera_settings' %}" onsubmit="return applySettings();">
       {% csrf_token %}
   
       <label for="brightness">Brightness (0–255)</label>
@@ -154,6 +154,12 @@
         el.innerText = data.recording ? "● Recording..." : "– Not recording";
         el.style.color = data.recording ? "red" : "white";
       });
+  }
+  function applySettings() {
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);  // kleiner Delay, damit der Stream Zeit hat, neu zu starten
+    return true;  // damit das Formular auch normal gesendet wird
   }
 
   function startRecording() {
