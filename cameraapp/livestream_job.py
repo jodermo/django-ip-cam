@@ -49,8 +49,17 @@ class LiveStreamJob:
             if cap and cap.isOpened():
                 settings = get_camera_settings()
                 apply_cv_settings(cap, settings, mode="video")
+
+                # Test read immediately after applying settings
+                ret, test_frame = cap.read()
+                if not ret or test_frame is None:
+                    print("[LIVE_STREAM_JOB] WARNING: Camera opened but failed to read a frame immediately.")
+                    cap.release()
+                    return None
+
                 print("[LIVE_STREAM_JOB] Reconnection successful.")
                 return cap
+
             print("[LIVE_STREAM_JOB] Reconnection failed.")
             return None
 
@@ -87,13 +96,6 @@ class LiveStreamJob:
             self.capture = None
 
         print("[LIVE_STREAM_JOB] Stopped.")
-
-        if self.shared_capture:
-            self.capture = self.shared_capture
-            print("[DEBUG] Using shared camera instance.")
-        else:
-            self.capture = try_open_camera(self.camera_source, retries=retry_limit, delay=retry_delay)
-
 
 
     def get_frame(self):
