@@ -8,7 +8,7 @@ import subprocess
 import cv2
 
 from django.apps import apps
-from .globals import livestream_job, camera_lock, latest_frame
+from .globals import livestream_job, camera_lock, latest_frame, latest_frame_lock
 from cameraapp.camera_manager import CameraManager
 from cameraapp.livestream_job import LiveStreamJob
 
@@ -194,3 +194,10 @@ def update_livestream_job(new_job):
     global livestream_job
     livestream_job = new_job
     globals()["livestream_job"] = new_job
+
+
+
+def update_latest_frame(f):
+    with latest_frame_lock:
+        globals()["latest_frame"] = f.copy()
+

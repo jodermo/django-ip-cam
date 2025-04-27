@@ -31,7 +31,7 @@ from .camera_core import (
     apply_cv_settings, get_camera_settings, get_camera_settings_safe,
     release_and_reset_camera
 )
-from .camera_utils import safe_restart_camera_stream
+from .camera_utils import safe_restart_camera_stream, update_latest_frame
 from .globals import (
     camera_lock, latest_frame, latest_frame_lock,
     livestream_resume_lock, livestream_job, taking_foto,
@@ -55,11 +55,6 @@ PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(RECORD_DIR, exist_ok=True)
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
-
-
-def update_latest_frame(f):
-    with latest_frame_lock:
-        globals()["latest_frame"] = f.copy()
 
 
 def logout_view(request):
