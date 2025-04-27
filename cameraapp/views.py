@@ -126,7 +126,6 @@ def get_latest_frame():
 @csrf_exempt
 def video_feed(request):
     global app_globals
-    print("[VIDEO_FEED] Frame available. Starting streaming response.")
 
     def frame_generator():
         while True:

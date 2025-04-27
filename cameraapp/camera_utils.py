@@ -213,7 +213,6 @@ def update_latest_frame(frame):
     global app_globals
     with app_globals.latest_frame_lock:
         app_globals.latest_frame = frame.copy()
-    print("[update_latest_frame] Frame updated.")
 
 
 
