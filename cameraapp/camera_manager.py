@@ -16,6 +16,12 @@ class CameraManager:
         self.running = True
         self.frame = None
 
+        # Öffne Kamera direkt bei Initialisierung
+        if not self._restart_camera():
+            self.running = False
+            print("[CameraManager] Failed to start camera thread due to unavailable camera.")
+            return
+
         self.thread = threading.Thread(target=self._capture_loop, daemon=True)
         self.thread.start()
 
@@ -48,20 +54,40 @@ class CameraManager:
         return False
 
     def _capture_loop(self):
+        if not self.cap:
+            print("[CameraManager] No initial camera instance. Capture loop exiting.")
+            return
+
         fail_count = 0
+
         while self.running:
+            if not self.cap:
+                print("[CameraManager] cap is None. Attempting to restart camera...")
+                if not self._restart_camera():
+                    time.sleep(self.retry_delay)
+                    continue
+
             ret, frame = self.cap.read()
-            if not ret:
+
+            if not ret or frame is None:
                 fail_count += 1
+                print(f"[CameraManager] Frame read failed ({fail_count}/5)")
+
                 if fail_count > 5:
-                    print("[CameraManager] Too many failures, restarting camera.")
-                    self._restart_camera()
+                    print("[CameraManager] Too many failures, restarting camera...")
+                    if not self._restart_camera():
+                        time.sleep(self.retry_delay)
                     fail_count = 0
-                time.sleep(0.5)
+                else:
+                    time.sleep(0.3)
                 continue
+
             fail_count = 0
             with self.lock:
                 self.frame = frame
+
+            time.sleep(0.01)  # Minimaler Delay, entlastet CPU
+
 
     def get_frame(self):
         with self.lock:
