@@ -126,11 +126,11 @@ def start_photo_scheduler():
                 take_photo()
                 interval_min = settings_obj.photo_interval_min
             else:
-                interval_min = 15
+                interval_min = 2
                 logger.info(f"[SCHEDULER] Timelapse disabled. Sleeping {interval_min} minutes.")
         except Exception as e:
             logger.error(f"[SCHEDULER] Error during scheduler cycle: {e}")
-            interval_min = 5
+            interval_min = 2
 
         time.sleep(interval_min * 60)
 
