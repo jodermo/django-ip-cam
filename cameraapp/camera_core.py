@@ -7,7 +7,8 @@ import threading
 import glob
 from cameraapp.models import CameraSettings
 from .camera_utils import safe_restart_camera_stream, update_latest_frame, get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe, update_livestream_job
-from .globals import camera_lock, camera, latest_frame_lock, latest_frame
+from .globals import camera_lock, camera, latest_frame_lock, latest_frame, livestream_job
+
 
 from .camera_manager import CameraManager
 
@@ -79,6 +80,12 @@ def init_camera():
                     update_livestream_job(livestream_job)
                 else:
                     print("[CAMERA_CORE] Failed to start livestream job.")
+
+            globals()["camera"] = camera
+            globals()["livestream_job"] = livestream_job
+
+            print(f"[DEBUG] camera is {camera}")
+            print(f"[DEBUG] livestream_job is {livestream_job}")
         else:
             print("[CAMERA_CORE] Camera could not be initialized.")
 

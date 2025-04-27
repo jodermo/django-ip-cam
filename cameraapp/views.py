@@ -126,7 +126,7 @@ def generate_frames():
 
 @login_required
 def video_feed(request):
-    global livestream_job, latest_frame_lock, latest_frame
+    global livestream_job, latest_frame_lock, latest_frame, camera
     with latest_frame_lock:
         if latest_frame is None:
             print("[VIDEO_FEED] No frame available (latest_frame is None). Returning 503.")
@@ -140,7 +140,7 @@ def video_feed(request):
 
 @login_required
 def stream_page(request):
-    global livestream_job
+    global livestream_job, camera
 
     settings_obj = get_camera_settings_safe(connection)
     camera_error = None
