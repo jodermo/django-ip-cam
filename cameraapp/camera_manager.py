@@ -119,8 +119,11 @@ class CameraManager:
 
 
     def get_frame(self):
-        with self.lock:
-            return self.frame.copy() if self.frame is not None else None
+        if not self.cap or not self.cap.isOpened():
+            print("[CameraManager] get_frame(): cap is not opened")
+            return None
+        ret, frame = self.cap.read()
+        return frame if ret else None
 
     def stop(self):
         print("[CameraManager] Stopping camera")

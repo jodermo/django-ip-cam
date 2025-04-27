@@ -43,16 +43,26 @@ def take_photo():
     logger.info("[PHOTO] Livestream not available. Trying fallback using CameraManager...")
 
     with app_globals.camera_lock:
-        if not app_globals.camera or not app_globals.camera.is_available():
-            logger.warning("[PHOTO] CameraManager not ready or unavailable.")
+        # Wait until cap is truly usable
+        max_attempts = 5
+        for i in range(max_attempts):
+            if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
+                ret, test_frame = app_globals.camera.cap.read()
+                if ret and test_frame is not None:
+                    break
+            logger.info(f"[PHOTO] Waiting for camera to stabilize... ({i+1}/{max_attempts})")
+            time.sleep(1.0)
+        else:
+            logger.error("[PHOTO] Camera not usable after wait.")
             return None
 
         settings = get_camera_settings()
         if settings:
             apply_cv_settings(app_globals.camera, settings, mode="photo")
 
-        # Capture frame using CameraManager
+        # Actual capture
         frame = app_globals.camera.get_frame()
+
 
         if frame is None:
             logger.error("[PHOTO] Failed to capture frame from fallback.")
