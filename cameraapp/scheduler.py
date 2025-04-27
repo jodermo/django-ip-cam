@@ -1,5 +1,3 @@
-# cameraapp/scheduler.py
-
 import os
 import time
 import cv2
@@ -10,7 +8,7 @@ from django.db import connections
 
 from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
 from .livestream_job import LiveStreamJob
-from .globals import camera_lock, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
+from .globals import latest_frame, latest_frame_lock
 
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
@@ -18,9 +16,10 @@ os.makedirs(PHOTO_DIR, exist_ok=True)
 
 
 def take_photo():
-    with globals.latest_frame_lock:
-        if globals.latest_frame is not None:
-            frame = globals.latest_frame.copy()
+    # Try saving a shared live frame
+    with latest_frame_lock:
+        if latest_frame is not None:
+            frame = latest_frame.copy()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
             if cv2.imwrite(filepath, frame):
@@ -30,7 +29,7 @@ def take_photo():
                 print("[PHOTO] Failed to save shared frame.")
                 return False
 
-    # Fallback
+    # Fallback: capture a fresh photo
     try:
         cap = cv2.VideoCapture(int(os.getenv("CAMERA_URL", "0")))
         if not cap.isOpened():
@@ -43,23 +42,28 @@ def take_photo():
         ret, frame = cap.read()
         cap.release()
 
-        if ret:
+        if ret and frame is not None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
             if cv2.imwrite(filepath, frame):
                 print(f"[PHOTO] Saved from fallback: {filepath}")
 
-                if globals.livestream_job and globals.livestream_job.running:
-                    globals.livestream_job.stop()
-                    globals.livestream_job.join(timeout=2.0)
+                # Restart livestream if it was running
+                if livestream_job and livestream_job.running:
+                    livestream_job.stop()
+                    livestream_job.join(timeout=2.0)
 
                 time.sleep(1.0)
                 new_cap = try_open_camera(int(os.getenv("CAMERA_URL", "0")), retries=3, delay=1.0)
                 if new_cap and new_cap.isOpened():
                     apply_cv_settings(new_cap, settings, mode="video")
-                    new_job = LiveStreamJob(int(os.getenv("CAMERA_URL", "0")), frame_callback=lambda f: setattr(globals, "latest_frame", f.copy()), shared_capture=new_cap)
+                    new_job = LiveStreamJob(
+                        int(os.getenv("CAMERA_URL", "0")),
+                        frame_callback=lambda f: setattr(app_globals, "latest_frame", f.copy()),
+                        shared_capture=new_cap
+                    )
                     new_job.start()
-                    globals.livestream_job = new_job
+                    livestream_job = new_job
                     print("[PHOTO] Livestream restarted successfully.")
                 else:
                     print("[PHOTO] Livestream restart failed.")
