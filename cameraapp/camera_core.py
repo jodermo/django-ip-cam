@@ -5,7 +5,7 @@ import cv2
 import time
 
 from cameraapp.models import CameraSettings
-from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera
+from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, force_restart_livestream
 from .globals import camera_lock, camera_capture
 
 from dotenv import load_dotenv
@@ -17,9 +17,7 @@ CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
 def init_camera():
     global camera_capture
-    if camera_capture and camera_capture.isOpened():
-        camera_capture.release()
-        time.sleep(1.0)
+
     with camera_lock:
         print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
 

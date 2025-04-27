@@ -158,3 +158,34 @@ def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, r
             logger.error(f"[RESTART] Failed to start livestream job: {e}")
             cap.release()
             return None
+
+
+
+def force_restart_livestream():
+    """
+    Ensure livestream is stopped and restarted cleanly.
+    """
+    global livestream_job
+    with camera_lock:
+        if livestream_job and livestream_job.running:
+            print("[LIVE] Stopping livestream for restart...")
+            livestream_job.stop()
+            livestream_job.join(timeout=2.0)
+            time.sleep(1.0)
+
+        cap = try_open_camera(0, retries=3, delay=1.0)
+        if not cap or not cap.isOpened():
+            print("[LIVE] Could not reopen camera.")
+            return False
+
+        settings = get_camera_settings()
+        apply_cv_settings(cap, settings, mode="video")
+
+        livestream_job = LiveStreamJob(
+            camera_source=0,
+            frame_callback=lambda f: setattr(globals(), 'latest_frame', f.copy()),
+            shared_capture=cap
+        )
+        livestream_job.start()
+        print("[LIVE] Livestream restarted.")
+        return True

@@ -27,7 +27,7 @@ from .models import CameraSettings
 from .camera_core import (
     init_camera, reset_to_default,
     apply_photo_settings, apply_auto_settings, auto_adjust_from_frame,
-    try_open_camera, apply_cv_settings, get_camera_settings,
+    try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream
 )
 from .camera_utils import safe_restart_camera_stream
 from .globals import (
@@ -111,40 +111,63 @@ def reset_camera_settings(request):
         init_camera()
     return redirect("settings_view")
 
+
+def live_stream_view(request):
+    # Sicherstellen, dass Livestream läuft
+    if not livestream_job or not livestream_job.running:
+        print("[VIEW] Livestream not running, attempting restart...")
+        force_restart_livestream()
+
+    return render(request, "camera/live.html", {
+        # ggf. weitere context-Variablen
+    })
+
+
+def generate_frames():
+    """
+    Generator-Funktion, die kontinuierlich JPEG-kodierte Frames aus dem Livestream liefert.
+    """
+    frame_fail_count = 0
+
+    while True:
+        if not livestream_job or not livestream_job.running:
+            print("[STREAM] Livestream job not running, exiting generator.")
+            break
+
+        frame = livestream_job.get_frame()
+
+        if frame is None:
+            time.sleep(0.1)
+            frame_fail_count += 1
+            if frame_fail_count > 100:
+                print("[STREAM] No frames available after multiple attempts, aborting stream.")
+                break
+            continue
+
+        frame_fail_count = 0
+        ret, buffer = cv2.imencode(".jpg", frame)
+        if not ret:
+            print("[STREAM] Frame encoding failed.")
+            continue
+
+        yield (
+            b"--frame\r\n"
+            b"Content-Type: image/jpeg\r\n\r\n" +
+            buffer.tobytes() +
+            b"\r\n"
+        )
+        time.sleep(0.03)
+
+
 @login_required
 def video_feed(request):
+    if not livestream_job or not livestream_job.running:
+        print("[VIDEO_FEED] Livestream not active. Restarting...")
+        force_restart_livestream()
+
+    return StreamingHttpResponse(generate_frames(), content_type="multipart/x-mixed-replace; boundary=frame")
 
 
-
-    with camera_lock:
-        if livestream_job and not livestream_job.running:
-            livestream_job.start()
-
-    def stream_generator():
-        frame_fail_count = 0
-        while True:
-            frame = livestream_job.get_frame()
-            if frame is None:
-                time.sleep(0.1)
-                frame_fail_count += 1
-                if frame_fail_count > 100:
-                    break
-                continue
-
-            frame_fail_count = 0
-            ret, buffer = cv2.imencode(".jpg", frame)
-            if not ret:
-                continue
-            yield (b"--frame\r\n"
-                   b"Content-Type: image/jpeg\r\n\r\n" +
-                   buffer.tobytes() + b"\r\n")
-            time.sleep(0.03)
-
-    try:
-        return StreamingHttpResponse(stream_generator(),
-            content_type="multipart/x-mixed-replace; boundary=frame")
-    except Exception as e:
-        return HttpResponseServerError("Streaming error")
 
 
 def apply_video_settings(cap):
