@@ -13,7 +13,7 @@ class CameraAppConfig(AppConfig):
             print("[CAMERA_APP] Skipping startup logic (RUN_MAIN != true).")
             return
 
-        run_timelapse = os.environ.get("RUN_TIMELAPSE", "0") == "1"
+        run_timelapse = os.environ.get("RUN_TIMELAPSE", "1") == "1"
         print(f"[CAMERA_APP] App ready. RUN_TIMELAPSE = {run_timelapse}")
 
         if run_timelapse:

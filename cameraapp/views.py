@@ -609,24 +609,23 @@ def pause_livestream():
 def resume_livestream():
     global app_globals
     with app_globals.livestream_resume_lock:
-        if app_globals.livestream_job and app_globals.livestream_job.running:
-            return
-        print("[PHOTO] Waiting for camera release...")
-        time.sleep(1.5)
+        print("[PHOTO] Attempting to resume livestream...")
 
-        for attempt in range(3):
-            with app_globals.livestream_resume_lock:
-                if not app_globals.livestream_job.running:
-                    app_globals.livestream_job.start()
-            time.sleep(1.0)
-            if app_globals.livestream_job and app_globals.livestream_job.running and app_globals.livestream_job.get_frame() is not None:
-                print("[PHOTO] Livestream restarted successfully.")
-                return
-            print(f"[PHOTO] Livestream restart failed (attempt {attempt + 1})")
+        # Stop current job if needed
+        if app_globals.livestream_job:
             app_globals.livestream_job.stop()
-            time.sleep(1.5)
+            app_globals.livestream_job.join(timeout=2.0)
 
-        print("[PHOTO] Livestream could not be restarted.")
+        # Force restart using camera_utils helper
+        new_job = safe_restart_camera_stream(
+            frame_callback=update_latest_frame,
+            camera_source=CAMERA_URL
+        )
+
+        if new_job and new_job.running:
+            print("[PHOTO] Livestream restarted successfully.")
+        else:
+            print("[PHOTO] Failed to restart livestream.")
 
 
 @csrf_exempt
@@ -634,17 +633,34 @@ def resume_livestream():
 @login_required
 def take_photo_now(request):
     global app_globals
+
     with app_globals.camera_lock:
         pause_livestream()
+
+        # Neue Kamera-Warte-Logik vor Fallback
+        max_attempts = 6
+        for attempt in range(max_attempts):
+            if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
+                print(f"[PHOTO] Camera ready on attempt {attempt + 1}")
+                break
+            print(f"[PHOTO] Waiting for camera... attempt {attempt + 1}/{max_attempts}")
+            time.sleep(1.0)
+        else:
+            resume_livestream()
+            return JsonResponse({"status": "camera not ready after retries"}, status=500)
+
         try:
             photo_path = take_photo()
+
             if not photo_path or not os.path.exists(photo_path):
-                return JsonResponse({"status": "Camera could not be opened."}, status=500)
+                return JsonResponse({"status": "photo capture failed"}, status=500)
+
             return JsonResponse({"status": "ok", "file": photo_path})
 
         finally:
             resume_livestream()
-    return JsonResponse({"status": "ok"})
+
+
 
 @csrf_exempt
 @require_POST
@@ -675,8 +691,14 @@ def auto_photo_adjust(request):
         return JsonResponse({"status": "adjusted from live frame"})
 
     print("[AUTO-ADJUST] No live frame, capturing temp image.")
-    if not app_globals.camera or not app_globals.camera.cap or not app_globals.camera.cap.isOpened():
-        return JsonResponse({"status": "camera not available"}, status=500)
+    max_attempts = 5
+    for attempt in range(max_attempts):
+        if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
+            break
+        print(f"[PHOTO] Waiting for camera... attempt {attempt + 1}/{max_attempts}")
+        time.sleep(1.0)
+    else:
+        return JsonResponse({"status": "camera not available after wait"}, status=500)
 
     apply_cv_settings(app_globals.camera, settings, mode="video")
     ret, temp_frame = app_globals.camera.cap.read()
