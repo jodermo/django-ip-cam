@@ -266,27 +266,7 @@ def force_restart_livestream():
 
 
 def start_camera_watchdog(interval_sec=10):
-    """
-    Überwacht kontinuierlich, ob die Kamera noch funktioniert.
-    Startet oder repariert die Verbindung bei Ausfall.
-    """
-    def watchdog_loop():
-        print("[WATCHDOG] Kamera-Watchdog gestartet.")
-        while True:
-            time.sleep(interval_sec)
-
-            if not livestream_job or not livestream_job.running:
-                print("[WATCHDOG] Livestream nicht aktiv. Starte neu...")
-                force_restart_livestream()
-                continue
-
-            frame = livestream_job.get_frame()
-            if frame is None:
-                print("[WATCHDOG] Kein Frame erkannt. Erzwinge Neustart.")
-                force_restart_livestream()
-
-    threading.Thread(target=watchdog_loop, daemon=True).start()
-
+    return  # Deaktiviert für Stabilitätstests
 
 def try_open_camera_safe(source, retries=3, delay=1.0):
     import gc

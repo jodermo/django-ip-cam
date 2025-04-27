@@ -56,27 +56,23 @@ def reset_to_default():
         return
 
     # Foto-Modus
-    settings.photo_exposure_mode = "manual"   # "auto" kann flackern, manual ist stabiler
-    settings.photo_brightness = 128.0         # Bereich meist 0–255
-    settings.photo_contrast = 32.0            # Bereich meist 0–255
-    settings.photo_saturation = 64.0          # Bereich meist 0–255
-    settings.photo_exposure = -6.0            # Bereich meist -13 bis -1 (dunkel → hell)
-    settings.photo_gain = 4.0                 # Bereich meist 0–10
+    settings.photo_exposure_mode = "manual"
+    settings.photo_brightness = 128.0
+    settings.photo_contrast = 32.0
+    settings.photo_saturation = 64.0
+    settings.photo_exposure = -6.0
+    settings.photo_gain = 4.0
 
     # Video-Modus
-    settings.video_exposure_mode = "auto"     # Auto-Exposure ist okay für Video
+    settings.video_exposure_mode = "auto"
     settings.video_brightness = 128.0
     settings.video_contrast = 32.0
     settings.video_saturation = 64.0
-    settings.video_exposure = -6.0            # Ignoriert bei Auto, aber gesetzt für fallback
+    settings.video_exposure = -6.0
     settings.video_gain = 4.0
-
 
     settings.save()
     print("[RESET] CameraSettings auf Default zurückgesetzt (Auto-Modus, keine Werte gesetzt).")
-
-    time.sleep(1.0)
-    init_camera()
 
 
 

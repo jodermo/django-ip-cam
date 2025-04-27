@@ -76,7 +76,7 @@
 
 <div id="streamContainer">
   <img id="streamImage" alt="Live Stream">
-  
+
   <div class="overlay-controls">
     <p><strong>User:</strong> {{ request.user.username }}</p>
     <p><strong>Viewers:</strong> {{ viewer_count }}</p>
@@ -126,9 +126,46 @@
       <button type="submit" style="margin-top: 1em;">✅ Apply</button>
     </form>
   </div>
+
+  <form id="manual-restart-form" method="post" action="{% url 'manual_restart_camera' %}">
+    {% csrf_token %}
+    <button type="submit" id="manual-restart-btn">📷 Kamera neu starten</button>
+  </form>
+  
+
+
 </div>
 
 <script>
+
+document.getElementById("manual-restart-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+  
+      const btn = document.getElementById("manual-restart-btn");
+      btn.disabled = true;
+      btn.innerText = "🔄 Neustart läuft...";
+  
+      fetch(this.action, {
+          method: "POST",
+          headers: {
+              "X-CSRFToken": this.querySelector("[name=csrfmiddlewaretoken]").value
+          }
+      }).then(res => {
+          if (res.ok) {
+              btn.innerText = "✅ Neustart erfolgreich";
+          } else {
+              btn.innerText = "❌ Neustart fehlgeschlagen";
+          }
+          setTimeout(() => {
+              btn.innerText = "📷 Kamera neu starten";
+              btn.disabled = false;
+          }, 3000);
+      }).catch(() => {
+          btn.innerText = "⚠️ Fehler beim Senden";
+          btn.disabled = false;
+      });
+  });
+  
   function toggleSettings() {
     const popup = document.getElementById("settingsPopup");
     popup.style.display = popup.style.display === "block" ? "none" : "block";

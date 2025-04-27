@@ -101,9 +101,7 @@ def reboot_pi(request):
 def reset_camera_settings(request):
     if request.method == "POST":
         reset_to_default()
-        time.sleep(0.5)
-        init_camera()
-    return redirect("settings_view")
+    return redirect("stream_page")
 
 
 def live_stream_view(request):
@@ -670,3 +668,22 @@ def photo_settings_page(request):
         "settings": settings_obj,
         "title": "Foto-Einstellungen"
     })
+
+
+@login_required
+@require_POST
+def manual_restart_camera(request):
+    from .camera_utils import safe_restart_camera_stream
+    from .globals import livestream_job
+
+    livestream_job = safe_restart_camera_stream(
+        livestream_job_ref=livestream_job,
+        camera_url=CAMERA_URL,
+        frame_callback=lambda f: update_latest_frame(f),
+        retries=5,
+        delay=2.0
+    )
+
+    globals()["livestream_job"] = livestream_job
+
+    return redirect("stream_page")
