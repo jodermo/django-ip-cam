@@ -49,8 +49,7 @@ services:
         echo '[MIGRATE] Waiting for database...' &&
         sleep 3 &&
         python manage.py migrate &&
-        echo '[MIGRATE] Done, starting scheduler...' &&
-        python manage.py runserver 0.0.0.0:8001
+        echo '[MIGRATE] Done, starting scheduler...'
       "
     env_file:
       - .env
