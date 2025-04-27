@@ -598,6 +598,7 @@ def update_photo_settings(request):
 
 
 def pause_livestream():
+    print("[PHOTO] pause_livestream")
     global app_globals
     with app_globals.livestream_resume_lock:
         if app_globals.livestream_job and app_globals.livestream_job.running:
@@ -606,6 +607,7 @@ def pause_livestream():
             time.sleep(0.5)
 
 def resume_livestream():
+    print("[PHOTO] resume_livestream")
     global app_globals
     if not app_globals.livestream_resume_lock.acquire(timeout=5):
         print("[PHOTO] Timeout acquiring livestream_resume_lock – skipping resume.")
@@ -640,13 +642,20 @@ def resume_livestream():
     finally:
         app_globals.livestream_resume_lock.release()
 
+def resume_livestream_safe():
+    try:
+        print("[PHOTO] resume_livestream_safe: Thread started")
+        resume_livestream()
+    except Exception as e:
+        print(f"[PHOTO] resume_livestream_safe: ERROR: {e}")
+
 @csrf_exempt
 @require_POST
 @login_required
 def take_photo_now(request):
     global app_globals
     photo_path = None
-
+    print("[PHOTO] take_photo_now")
     try:
         with app_globals.camera_lock:
             pause_livestream()
@@ -666,8 +675,9 @@ def take_photo_now(request):
                 return JsonResponse({"status": "photo capture failed"}, status=500)
 
     finally:
-        # Achtung: außerhalb des camera_lock aufrufen
-        threading.Thread(target=resume_livestream, daemon=True).start()
+        # Logging + Exception safe
+        print("[PHOTO] Spawning resume_livestream thread")
+        threading.Thread(target=resume_livestream_safe, daemon=True).start()
 
     return JsonResponse({"status": "ok", "file": photo_path})
 
