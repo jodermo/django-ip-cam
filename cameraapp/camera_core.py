@@ -49,14 +49,23 @@ else:
 
 def init_camera():
     global camera
-    # If one exists, tear it down first
     if camera:
-        camera.stop()
-        time.sleep(1.0)
+        try:
+            camera.stop()
+            time.sleep(1.0)
+        except Exception as e:
+            print(f"[CAMERA_CORE] Failed to stop previous camera: {e}")
 
-    # Create the one-and-only CameraManager:
-    camera = CameraManager(source=CAMERA_URL)
-    print("[CAMERA_CORE] CameraManager initialized")
+    print("[CAMERA_CORE] Initializing new CameraManager...")
+    camera_instance = CameraManager(source=CAMERA_URL)
+    if not camera_instance or not camera_instance.cap or not camera_instance.cap.isOpened():
+        print("[CAMERA_CORE] Camera could not be initialized.")
+        camera = None
+        return
+
+    camera_instance.start()
+    camera = camera_instance  # setzt die globale Instanz
+    print("[CAMERA_CORE] CameraManager started.")
 
 
 def reset_to_default():
