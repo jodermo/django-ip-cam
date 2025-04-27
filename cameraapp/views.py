@@ -185,6 +185,7 @@ def stream_page(request):
                             test_cap = cv2.VideoCapture(0)
                             if test_cap.isOpened():
                                 test_cap.release()
+                                time.sleep(1.5)
                                 print("[RELEASE] Kamera testweise geöffnet → Freigabe erfolgreich.")
                                 break
                         except:
@@ -680,6 +681,7 @@ def auto_photo_adjust(request):
 
     ret, temp_frame = cap.read()
     cap.release()
+    time.sleep(1.5)
 
     if not ret or temp_frame is None:
         return JsonResponse({"status": "could not capture frame"}, status=500)
@@ -721,6 +723,7 @@ def wait_until_camera_available(device_index=0, max_attempts=5, delay=1.0):
         cap = cv2.VideoCapture(device_index)
         if cap.isOpened():
             cap.release()
+            time.sleep(1.5)
             print(f"[CAMERA_UTIL] /dev/video{device_index} ist verfügbar.")
             return True
         else:
