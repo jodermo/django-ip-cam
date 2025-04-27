@@ -1,36 +1,50 @@
 # cameraapp/recording_job.py
 
+import os
 import threading
 import time
+import logging
 import cv2
-import os
-from .livestream_job import LiveStreamJob
 from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
-from .globals import livestream_job
+from . import globals as app_globals
+
+logger = logging.getLogger(__name__)
+
 
 def safe_restart_livestream():
-    global livestream_job
-    if livestream_job and livestream_job.running:
-        livestream_job.stop()
-        livestream_job.join(timeout=2.0)
+    """
+    Stop any running livestream and restart it using shared globals.
+    """
+    if app_globals.livestream_job and getattr(app_globals.livestream_job, 'running', False):
+        logger.info("[RECORDING] Stopping existing livestream...")
+        try:
+            app_globals.livestream_job.stop()
+            app_globals.livestream_job.join(timeout=2.0)
+        except Exception as e:
+            logger.warning(f"[RECORDING] Error stopping livestream: {e}")
 
     time.sleep(1.0)
     settings = get_camera_settings()
     cap = try_open_camera(int(os.getenv("CAMERA_URL", "0")), retries=3, delay=1.0)
-    if cap and cap.isOpened():
-        apply_cv_settings(cap, settings, mode="video")
-        livestream_job = LiveStreamJob(
-            int(os.getenv("CAMERA_URL", "0")),
-            frame_callback=lambda f: setattr(__import__('cameraapp.globals'), 'latest_frame', f.copy()),
-            shared_capture=cap
-        )
-        livestream_job.start()
-        print("[RECORDING] Livestream restarted.")
-    else:
-        print("[RECORDING] Failed to restart livestream.")
+    if not cap or not cap.isOpened():
+        logger.error("[RECORDING] Failed to reopen camera for livestream.")
+        return
+
+    apply_cv_settings(cap, settings, mode="video")
+    from .livestream_job import LiveStreamJob
+    job = LiveStreamJob(
+        camera_source=int(os.getenv("CAMERA_URL", "0")),
+        frame_callback=lambda f: setattr(app_globals, 'latest_frame', f.copy()),
+        shared_capture=cap
+    )
+    job.start()
+    app_globals.livestream_job = job
+    logger.info("[RECORDING] Livestream restarted successfully.")
+
 
 class RecordingJob:
-    def __init__(self, filepath, duration, fps, resolution, codec, frame_provider, lock):
+    def __init__(self, filepath: str, duration: float, fps: float, resolution: tuple[int,int], 
+                 codec: str, frame_provider: callable, lock: threading.Lock):
         self.filepath = filepath
         self.duration = duration
         self.fps = fps
@@ -38,45 +52,42 @@ class RecordingJob:
         self.codec = codec
         self.frame_provider = frame_provider
         self.lock = lock
-        self.thread = threading.Thread(target=self.run)
+        self.thread = threading.Thread(target=self._run, name="RecordingJob", daemon=True)
         self.active = False
         self.frame_count = 0
 
-    def start(self):
-        print(f"[RecordingJob] Starting job: {self.filepath}")
+    def start(self) -> None:
+        logger.info(f"[RecordingJob] Starting: {self.filepath}")
         self.active = True
         self.thread.start()
 
-    def run(self):
-        print(f"[RecordingJob] Opening VideoWriter: {self.filepath}")
+    def _run(self) -> None:
+        logger.info(f"[RecordingJob] Opening writer: {self.filepath}")
         fourcc = cv2.VideoWriter_fourcc(*self.codec)
         out = cv2.VideoWriter(self.filepath, fourcc, self.fps, self.resolution)
         if not out.isOpened():
-            print("[RecordingJob] Error: VideoWriter failed to open.")
+            logger.error("[RecordingJob] Cannot open VideoWriter.")
             self.active = False
             return
 
         start_time = time.time()
-        max_empty_wait = 5  # seconds without frames before abort
         empty_start = None
+        max_empty = 5
 
-        print("[RecordingJob] Recording loop started.")
-        while time.time() - start_time < self.duration and self.active:
+        while self.active and (time.time() - start_time) < self.duration:
             with self.lock:
                 frame = self.frame_provider()
 
             if frame is None:
                 if empty_start is None:
                     empty_start = time.time()
-                    print("[RecordingJob] No frame received, starting empty wait timer.")
-                elif time.time() - empty_start > max_empty_wait:
-                    print("[RecordingJob] No frames received for too long. Aborting.")
+                    logger.debug("[RecordingJob] No frame yet, waiting...")
+                elif (time.time() - empty_start) > max_empty:
+                    logger.error("[RecordingJob] No frames for too long, aborting.")
                     break
                 time.sleep(0.05)
                 continue
             else:
-                if empty_start is not None:
-                    print("[RecordingJob] Frame received after empty wait.")
                 empty_start = None
 
             try:
@@ -84,17 +95,16 @@ class RecordingJob:
                 out.write(resized)
                 self.frame_count += 1
                 if self.frame_count % 10 == 0:
-                    print(f"[RecordingJob] Wrote {self.frame_count} frames...")
+                    logger.info(f"[RecordingJob] Wrote {self.frame_count} frames...")
             except Exception as e:
-                print(f"[RecordingJob] Frame write error: {e}")
+                logger.error(f"[RecordingJob] Write error: {e}")
                 break
 
-        print("[RecordingJob] Releasing VideoWriter...")
         out.release()
         self.active = False
-        print(f"[RecordingJob] Finished: {self.filepath}, total frames: {self.frame_count}")
+        logger.info(f"[RecordingJob] Finished: {self.frame_count} frames to {self.filepath}")
         safe_restart_livestream()
 
-    def stop(self):
-        print(f"[RecordingJob] Stop requested for: {self.filepath}")
+    def stop(self) -> None:
+        logger.info(f"[RecordingJob] Stop requested: {self.filepath}")
         self.active = False

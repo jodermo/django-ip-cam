@@ -2,91 +2,146 @@
 
 import threading
 import time
+import logging
+from typing import Callable, Optional, Union
+
 from .globals import livestream_lock
-from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
+
+logger = logging.getLogger(__name__)
 
 class LiveStreamJob:
-    def __init__(self, camera_source, frame_callback=None, shared_capture=None):
+    """
+    Manages a live camera stream on a background thread.
+
+    Attributes:
+        camera_source: index or URL of the camera
+        frame_callback: optional function to receive each frame
+        shared_capture: optionally reuse an existing VideoCapture
+    """
+    def __init__(
+        self,
+        camera_source: Union[int, str],
+        frame_callback: Optional[Callable[[any], None]] = None,
+        shared_capture=None
+    ):
         self.camera_source = camera_source
         self.frame_callback = frame_callback
-        self.running = False
-        self.latest_frame = None
-        self.thread = None
-        self.capture = shared_capture or None
         self.shared_capture = shared_capture
+        self.capture = shared_capture
+        self.latest_frame = None
+        self.running = False
+        self.thread: Optional[threading.Thread] = None
 
-    def start(self):
+    def start(self) -> None:
+        """Begin streaming in a daemon thread."""
         if self.running:
             return
         self.running = True
-        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread = threading.Thread(
+            target=self._run,
+            name="LiveStreamJob",
+            daemon=True
+        )
         self.thread.start()
+        logger.info("[LIVE] LiveStreamJob started")
 
-    def stop(self):
+    def stop(self) -> None:
+        """Stop streaming and release capture if not shared."""
         with livestream_lock:
             self.running = False
             if self.capture and not self.shared_capture:
-                self.capture.release()
-                self.capture = None
+                try:
+                    self.capture.release()
+                    logger.info("[LIVE] Camera capture released")
+                except Exception as e:
+                    logger.warning(f"[LIVE] Error releasing capture: {e}")
+                finally:
+                    self.capture = None
+        logger.info("[LIVE] LiveStreamJob stop called")
 
-    def restart(self):
+    def restart(self) -> None:
+        """Stop and then restart the streaming thread."""
+        logger.info("[LIVE] Restarting LiveStreamJob")
         self.stop()
         time.sleep(1.0)
         self.start()
 
-    def recover(self):
-        print("[LIVE_STREAM_JOB] Attempting recovery...")
+    def recover(self) -> None:
+        """Attempt recovery by stopping, joining, then restarting."""
+        logger.info("[LIVE] Recovering LiveStreamJob")
         self.stop()
         self.join(timeout=2.0)
         time.sleep(1.0)
         self.start()
 
-    def join(self, timeout=None):
+    def join(self, timeout: Optional[float] = None) -> None:
+        """Wait for the streaming thread to finish."""
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout)
+            logger.info("[LIVE] LiveStreamJob thread joined")
 
-    def _run(self):
-        def reconnect():
+    def _run(self) -> None:
+        """Internal loop: open camera, read frames, and invoke callbacks."""
+        def reconnect() -> Optional[any]:
             if self.shared_capture:
-                print("[LIVE_STREAM_JOB] Shared capture provided — skipping reconnect.")
+                logger.debug("[LIVE] Using shared capture")
                 return self.shared_capture
-            print("[LIVE_STREAM_JOB] Attempting to open camera...")
+
+            from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
+
+            logger.info(f"[LIVE] Opening camera source: {self.camera_source}")
             cap = try_open_camera(self.camera_source, retries=5, delay=2.0)
             if cap and cap.isOpened():
                 settings = get_camera_settings()
                 apply_cv_settings(cap, settings, mode="video")
-                print("[LIVE_STREAM_JOB] Camera opened successfully.")
+                logger.info("[LIVE] Camera opened successfully")
                 return cap
-            print("[LIVE_STREAM_JOB] Failed to open camera.")
+
+            logger.error("[LIVE] Failed to open camera after retries")
             return None
 
         self.capture = reconnect()
-        if not self.capture or not self.capture.isOpened():
+        if not self.capture:
             self.running = False
             return
 
-        print("[LIVE_STREAM_JOB] Streaming started.")
+        logger.info("[LIVE] Streaming loop entering")
         while self.running:
-            ret, frame = self.capture.read()
-            if not ret or frame is None:
-                print("[LIVE_STREAM_JOB] Frame read failed.")
-                time.sleep(0.2)
-                continue
+            try:
+                ret, frame = self.capture.read()
+                if not ret or frame is None:
+                    logger.debug("[LIVE] Frame read failed, retrying...")
+                    time.sleep(0.2)
+                    continue
 
-            if self.frame_callback:
-                self.frame_callback(frame)
+                if self.frame_callback:
+                    try:
+                        self.frame_callback(frame)
+                    except Exception as cb_err:
+                        logger.warning(f"[LIVE] Frame callback error: {cb_err}")
 
-            with livestream_lock:
-                self.latest_frame = frame.copy()
+                with livestream_lock:
+                    self.latest_frame = frame.copy()
 
-            time.sleep(0.03)
+                time.sleep(0.03)
+            except Exception as run_err:
+                logger.error(f"[LIVE] Exception in streaming loop: {run_err}")
+                break
 
+        # Clean up capture if not shared
         if self.capture and not self.shared_capture:
-            self.capture.release()
-            self.capture = None
+            try:
+                self.capture.release()
+            except Exception as e:
+                logger.warning(f"[LIVE] Error releasing capture on exit: {e}")
+            finally:
+                self.capture = None
 
-        print("[LIVE_STREAM_JOB] Stopped.")
+        logger.info("[LIVE] Streaming loop exited")
 
-    def get_frame(self):
+    def get_frame(self) -> Optional[any]:
+        """Retrieve the last captured frame, if any."""
         with livestream_lock:
-            return self.latest_frame.copy() if self.latest_frame is not None else None
+            if self.latest_frame is not None:
+                return self.latest_frame.copy()
+        return None

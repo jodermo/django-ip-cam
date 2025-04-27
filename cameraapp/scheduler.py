@@ -1,3 +1,5 @@
+# cameraapp/sheduler.py
+
 import os
 import time
 import cv2
@@ -8,18 +10,20 @@ from django.db import connections
 
 from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
 from .livestream_job import LiveStreamJob
-from .globals import latest_frame, latest_frame_lock
-
+from . import globals as app_globals
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
 
 def take_photo():
-    # Try saving a shared live frame
-    with latest_frame_lock:
-        if latest_frame is not None:
-            frame = latest_frame.copy()
+    """
+    Capture a photo either from the shared live frame or via a fallback capture.
+    """
+    # 1) Try saving the latest shared live frame
+    with app_globals.latest_frame_lock:
+        if app_globals.latest_frame is not None:
+            frame = app_globals.latest_frame.copy()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
             if cv2.imwrite(filepath, frame):
@@ -29,7 +33,7 @@ def take_photo():
                 print("[PHOTO] Failed to save shared frame.")
                 return False
 
-    # Fallback: capture a fresh photo
+    # 2) Fallback: capture a fresh frame directly from camera
     try:
         cap = cv2.VideoCapture(int(os.getenv("CAMERA_URL", "0")))
         if not cap.isOpened():
@@ -49,9 +53,9 @@ def take_photo():
                 print(f"[PHOTO] Saved from fallback: {filepath}")
 
                 # Restart livestream if it was running
-                if livestream_job and livestream_job.running:
-                    livestream_job.stop()
-                    livestream_job.join(timeout=2.0)
+                if app_globals.livestream_job and app_globals.livestream_job.running:
+                    app_globals.livestream_job.stop()
+                    app_globals.livestream_job.join(timeout=2.0)
 
                 time.sleep(1.0)
                 new_cap = try_open_camera(int(os.getenv("CAMERA_URL", "0")), retries=3, delay=1.0)
@@ -63,7 +67,7 @@ def take_photo():
                         shared_capture=new_cap
                     )
                     new_job.start()
-                    livestream_job = new_job
+                    app_globals.livestream_job = new_job
                     print("[PHOTO] Livestream restarted successfully.")
                 else:
                     print("[PHOTO] Livestream restart failed.")
@@ -75,6 +79,9 @@ def take_photo():
 
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
+    """
+    Block until the specified table exists in the database or timeout is reached.
+    """
     start = time.time()
     while time.time() - start < timeout:
         try:
@@ -87,6 +94,9 @@ def wait_for_table(table_name, db_alias="default", timeout=30):
 
 
 def start_photo_scheduler():
+    """
+    Main loop for triggering timelapse photos based on settings.
+    """
     print("[SCHEDULER] Starting timelapse scheduler...")
     wait_for_table("cameraapp_camerasettings")
 
