@@ -3,7 +3,7 @@ import time
 from .camera_core import try_open_camera, apply_cv_settings, get_camera_settings
 
 class LiveStreamJob:
-    def __init__(self, camera_source, frame_callback=None):
+    def __init__(self, camera_source, frame_callback=None, shared_capture=None):
         self.camera_source = camera_source
         self.frame_callback = frame_callback
         self.lock = threading.Lock()
@@ -11,6 +11,7 @@ class LiveStreamJob:
         self.latest_frame = None
         self.thread = None
         self.capture = None
+        self.shared_capture = shared_capture 
 
     def start(self):
         if self.running:
@@ -41,6 +42,9 @@ class LiveStreamJob:
 
         def reconnect():
             print("[LIVE_STREAM_JOB] Attempting to reconnect camera...")
+            if self.shared_capture:
+                print("[DEBUG] Using shared camera instance.")
+                return self.shared_capture
             cap = try_open_camera(self.camera_source, retries=retry_limit, delay=retry_delay)
             if cap and cap.isOpened():
                 settings = get_camera_settings()
@@ -49,6 +53,7 @@ class LiveStreamJob:
                 return cap
             print("[LIVE_STREAM_JOB] Reconnection failed.")
             return None
+
 
         self.capture = reconnect()
         if not self.capture:
@@ -82,6 +87,14 @@ class LiveStreamJob:
             self.capture = None
 
         print("[LIVE_STREAM_JOB] Stopped.")
+
+        if self.shared_capture:
+            self.capture = self.shared_capture
+            print("[DEBUG] Using shared camera instance.")
+        else:
+            self.capture = try_open_camera(self.camera_source, retries=retry_limit, delay=retry_delay)
+
+
 
     def get_frame(self):
         with self.lock:

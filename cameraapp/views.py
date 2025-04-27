@@ -60,10 +60,10 @@ livestream_job = None
 
 
 
-def get_livestream_job(camera_source, frame_callback=None):
+def get_livestream_job(camera_source, frame_callback=None, shared_capture=None):
     global livestream_job
     from cameraapp.livestream_job import LiveStreamJob
-    livestream_job = LiveStreamJob(camera_source, frame_callback)
+    livestream_job = LiveStreamJob(camera_source, frame_callback, shared_capture)
     return livestream_job
 
 
@@ -72,7 +72,11 @@ def update_latest_frame(frame):
     with latest_frame_lock:
         latest_frame = frame.copy()
 
-livestream_job = get_livestream_job(CAMERA_URL, update_latest_frame)
+livestream_job = get_livestream_job(
+    camera_source=CAMERA_URL,
+    frame_callback=lambda f: update_latest_frame(f),
+    shared_capture=camera_instance
+)
 
 def logout_view(request):
     logout(request)
@@ -183,7 +187,11 @@ def stream_page(request):
             if livestream_job:
                 livestream_job.start()
 
-    livestream_job = get_livestream_job(CAMERA_URL, update_latest_frame)
+    livestream_job = get_livestream_job(
+        camera_source=CAMERA_URL,
+        frame_callback=lambda f: update_latest_frame(f),
+        shared_capture=camera_instance
+    )
 
     if livestream_job and not livestream_job.running:
         livestream_job.start()
@@ -479,7 +487,8 @@ def update_camera_settings(request):
 
         livestream_job = get_livestream_job(
             camera_source=CAMERA_URL,
-            frame_callback=lambda f: update_latest_frame(f)
+            frame_callback=lambda f: update_latest_frame(f),
+            shared_capture=camera_instance
         )
         globals()["livestream_job"] = livestream_job
         livestream_job.start()
