@@ -75,7 +75,7 @@
 </style>
 
 <div id="streamContainer">
-  <img id="streamImage" src="{% url 'video_feed' %}" />
+  <canvas id="streamCanvas" width="1280" height="720"></canvas>
   <div class="overlay-controls">
     <p><strong>User:</strong> {{ request.user.username }}</p>
     <p><strong>Viewers:</strong> {{ viewer_count }}</p>
@@ -215,12 +215,25 @@ document.getElementById("manual-restart-form").addEventListener("submit", functi
   }
 
   function updateStreamImage() {
-    const img = document.getElementById("streamImage");
-    img.src = "{% url 'video_feed' %}?t=" + new Date().getTime();
+    const canvas = document.getElementById("streamCanvas");
+    const ctx = canvas.getContext("2d");
+
+    fetch("{% url 'video_feed' %}?t=" + new Date().getTime())
+      .then(res => res.blob())
+      .then(blob => {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        };
+        img.src = URL.createObjectURL(blob);
+      })
+      .catch(err => console.error("[STREAM] Frame fetch failed:", err));
   }
+
+  setInterval(updateStreamImage, 100); // 10 FPS
   setInterval(updateRecordingStatus, 3000);
   updateRecordingStatus();
-  // setInterval(updateStreamImage, 100);
+
 
 </script>
 {% endblock %}
