@@ -1,6 +1,7 @@
 # cameraapp/views.py
 
 import os
+from cameraapp.recording_job import RecordingJob
 import cv2
 import time
 import threading
@@ -32,13 +33,7 @@ from .camera_core import (
     release_and_reset_camera
 )
 from .camera_utils import safe_restart_camera_stream, update_latest_frame
-from .globals import (
-    camera_lock, latest_frame, latest_frame_lock,
-    livestream_resume_lock, livestream_job, taking_foto,
-    active_stream_viewers, last_disconnect_time, recording_timeout,
-    recording_job, camera
-)
-from .recording_job import RecordingJob
+from . import globals as app_globals
 from .scheduler import take_photo 
 
 
@@ -91,44 +86,46 @@ def generate_frames():
     """
     Generator-Funktion, die kontinuierlich JPEG-kodierte Frames aus dem Livestream liefert.
     """
+    global app_globals
     frame_fail_count = 0
 
     while True:
-        if not livestream_job or not livestream_job.running:
+        if not app_globals.livestream_job or not app_globals.livestream_job.running:
             print("[STREAM] Livestream job not running, exiting generator.")
             break
 
-        frame = latest_frame.copy() if latest_frame is not None else None
+        with app_globals.latest_frame_lock:
+            frame = app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
 
-        if frame is None:
-            time.sleep(0.1)
-            frame_fail_count += 1
-            if frame_fail_count > 100:
-                print("[STREAM] No frames available after multiple attempts, aborting stream.")
-                break
-            continue
+            if frame is None:
+                time.sleep(0.1)
+                frame_fail_count += 1
+                if frame_fail_count > 100:
+                    print("[STREAM] No frames available after multiple attempts, aborting stream.")
+                    break
+                continue
 
-        frame_fail_count = 0
-        ret, buffer = cv2.imencode(".jpg", frame)
-        if not ret:
-            print("[STREAM] Frame encoding failed.")
-            continue
+            frame_fail_count = 0
+            ret, buffer = cv2.imencode(".jpg", frame)
+            if not ret:
+                print("[STREAM] Frame encoding failed.")
+                continue
 
-        yield (
-            b"--frame\r\n"
-            b"Content-Type: image/jpeg\r\n\r\n" +
-            buffer.tobytes() +
-            b"\r\n"
-        )
-        time.sleep(0.03)
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" +
+                buffer.tobytes() +
+                b"\r\n"
+            )
+            time.sleep(0.03)
 
 
 
 @login_required
 def video_feed(request):
-    global livestream_job, latest_frame_lock, latest_frame, camera
-    with latest_frame_lock:
-        if latest_frame is None:
+    global app_globals
+    with app_globals.latest_frame_lock:
+        if app_globals.latest_frame is None:
             print("[VIDEO_FEED] No frame available (latest_frame is None). Returning 503.")
             return HttpResponse("No frame", status=503)
     print("[VIDEO_FEED] Frame available. Starting streaming response.")
@@ -140,24 +137,24 @@ def video_feed(request):
 
 @login_required
 def stream_page(request):
-    global livestream_job, camera
+    global app_globals
 
     settings_obj = get_camera_settings_safe(connection)
     camera_error = None
 
-    if not camera or not camera.is_available():
+    if not app_globals.camera or not app_globals.camera.is_available():
         print("[STREAM_PAGE] Camera is not available, initializing...")
         init_camera()
 
-    if not livestream_job or not livestream_job.running:
+    if not app_globals.livestream_job or not app_globals.livestream_job.running:
         print("[STREAM_PAGE] Livestream not active, starting...")
-        with livestream_resume_lock:
-            livestream_job = safe_restart_camera_stream(
+        with app_globals.livestream_resume_lock:
+            app_globals.livestream_job = safe_restart_camera_stream(
                 frame_callback=update_latest_frame,
                 camera_source=CAMERA_URL
             )
-            if livestream_job:
-                globals()["livestream_job"] = livestream_job
+            if app_globals.livestream_job:
+                globals()["livestream_job"] = app_globals.livestream_job
                 print("[STREAM_PAGE] Livestream started successfully.")
             else:
                 print("[STREAM_PAGE] Failed to start livestream.")
@@ -166,8 +163,8 @@ def stream_page(request):
     # Warte auf ersten Frame
     start_time = time.time()
     while time.time() - start_time < 5:
-        if livestream_job and livestream_job.running:
-            frame = livestream_job.get_frame()
+        if app_globals.livestream_job and app_globals.livestream_job.running:
+            frame = app_globals.livestream_job.get_frame()
             if frame is not None:
                 update_latest_frame(frame)
                 print("[STREAM_PAGE] First frame received.")
@@ -180,7 +177,7 @@ def stream_page(request):
     return render(request, "cameraapp/stream.html", {
         "camera_error": camera_error,
         "title": "Live Stream",
-        "viewer_count": active_stream_viewers,
+        "viewer_count": app_globals.active_stream_viewers,
         "settings": settings_obj
     })
 
@@ -189,7 +186,7 @@ def stream_page(request):
 @login_required
 def record_video(request):
     print("[RECORD_VIDEO] Called via GET")
-
+    global app_globals
     settings_obj = get_camera_settings()
     if not settings_obj:
         return JsonResponse({"error": "No camera settings found."}, status=500)
@@ -236,7 +233,7 @@ def reset_camera_view(request):
 
 def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
     print(f"[RECORD_TO_FILE] Start recording to {filepath} (duration={duration}s, fps={fps}, resolution={resolution})")
-
+    global app_globals
     try:
         fourcc = cv2.VideoWriter_fourcc(*codec)
         out = cv2.VideoWriter(filepath, fourcc, fps, resolution)
@@ -248,8 +245,8 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
         start_time = time.time()
 
         while time.time() - start_time < duration:
-            with latest_frame_lock:
-                frame = latest_frame.copy() if latest_frame is not None else None
+            with app_globals.latest_frame_lock:
+                frame = app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
 
             if frame is None:
                 time.sleep(0.05)
@@ -278,11 +275,12 @@ def record_video_to_file(filepath, duration, fps, resolution, codec="mp4v"):
 @require_POST
 @login_required
 def start_recording(request):
-    if recording_job and recording_job.active:
+    global app_globals
+    if app_globals.recording_job and app_globals.recording_job.active:
         return JsonResponse({"status": "already recording"})
 
     settings_obj = get_camera_settings()
-    duration = recording_timeout
+    duration = app_globals.recording_timeout
     fps = settings_obj.record_fps if settings_obj else 20.0
     resolution = (
         settings_obj.resolution_width if settings_obj else 640,
@@ -292,27 +290,28 @@ def start_recording(request):
     filepath = os.path.join(RECORD_DIR, f"clip_{time.strftime('%Y%m%d-%H%M%S')}.mp4")
 
     def frame_provider():
-        with latest_frame_lock:
-            return latest_frame.copy() if latest_frame is not None else None
+        with app_globals.latest_frame_lock:
+            return app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
 
-    recording_job = RecordingJob(
+    app_globals.recording_job = RecordingJob(
         filepath=filepath,
         duration=duration,
         fps=fps,
         resolution=resolution,
         codec=codec,
         frame_provider=frame_provider,
-        lock=latest_frame_lock
+        lock=app_globals.latest_frame_lock
     )
-    recording_job.start()
+    app_globals.recording_job.start()
     return JsonResponse({"status": "started", "file": filepath})
 
 @csrf_exempt
 @require_POST
 @login_required
 def stop_recording(request):
-    if recording_job and recording_job.active:
-        recording_job.stop()
+    global app_globals
+    if app_globals.recording_job and app_globals.recording_job.active:
+        app_globals.recording_job.stop()
         return JsonResponse({"status": "stopping"})
     return JsonResponse({"status": "not active"})
 
@@ -321,7 +320,8 @@ def stop_recording(request):
 @csrf_exempt
 @login_required
 def is_recording(request):
-    state = recording_job.active if recording_job else False
+    global app_globals
+    state = app_globals.recording_job.active if app_globals.recording_job else False
     return JsonResponse({"recording": state})
 
 
@@ -403,7 +403,7 @@ def media_browser(request):
 @require_POST
 @login_required
 def reset_camera_settings(request):
-    global livestream_job
+    global app_globals
 
     try:
         settings_obj = get_camera_settings_safe(connection)
@@ -427,26 +427,26 @@ def reset_camera_settings(request):
         print(f"[RESET_CAMERA_SETTINGS] Fehler beim Zurücksetzen: {e}")
         return HttpResponseRedirect(reverse("settings_view"))
 
-    if not livestream_job:
+    if not app_globals.livestream_job:
         print("[RESET_CAMERA_SETTINGS] Kein aktiver Livestream-Job.")
         return HttpResponseRedirect(reverse("settings_view"))
 
-    with camera_lock:
+    with app_globals.camera_lock:
         try:
-            livestream_job.stop()
-            livestream_job.join(timeout=2.0)
+            app_globals.livestream_job.stop()
+            app_globals.livestream_job.join(timeout=2.0)
             print("[RESET_CAMERA_SETTINGS] Livestream gestoppt.")
 
             release_and_reset_camera()
             print("[RESET_CAMERA_SETTINGS] Kamera freigegeben.")
 
-            livestream_job = safe_restart_camera_stream(
+            app_globals.livestream_job = safe_restart_camera_stream(
                 camera_source=CAMERA_URL,
                 frame_callback=lambda f: update_latest_frame(f)
             )
 
-            if livestream_job:
-                globals()["livestream_job"] = livestream_job
+            if app_globals.livestream_job:
+                globals()["livestream_job"] = app_globals.livestream_job
                 print("[RESET_CAMERA_SETTINGS] Kamera erfolgreich neu gestartet.")
             else:
                 print("[RESET_CAMERA_SETTINGS] Neustart fehlgeschlagen.")
@@ -460,7 +460,7 @@ def reset_camera_settings(request):
 @require_POST
 @login_required
 def update_camera_settings(request):
-    global livestream_job
+    global app_globals
 
     try:
         settings_obj = get_camera_settings_safe(connection)
@@ -496,28 +496,28 @@ def update_camera_settings(request):
         print(f"[UPDATE_CAMERA_SETTINGS] Error during settings update: {e}")
         return HttpResponseRedirect(reverse("stream_page"))
 
-    if not livestream_job:
+    if not app_globals.livestream_job:
         print("[UPDATE_CAMERA_SETTINGS] No livestream_job active.")
         return HttpResponseRedirect(reverse("stream_page"))
 
-    with camera_lock:
+    with app_globals.camera_lock:
         try:
-            livestream_job.stop()
-            livestream_job.join(timeout=2.0)
+            app_globals.livestream_job.stop()
+            app_globals.livestream_job.join(timeout=2.0)
             print("[UPDATE_CAMERA_SETTINGS] Livestream stopped.")
 
             release_and_reset_camera()
             print("[RELEASE] Camera released.")
 
             print("[DEBUG] Calling safe_restart_camera_stream...")
-            livestream_job = safe_restart_camera_stream(
+            app_globals.livestream_job = safe_restart_camera_stream(
                 frame_callback=lambda f: update_latest_frame(f),
                 camera_source=CAMERA_URL
             )
-            print(f"[DEBUG] Result from restart: {livestream_job}")
+            print(f"[DEBUG] Result from restart: {app_globals.livestream_job}")
 
-            if livestream_job:
-                globals()["livestream_job"] = livestream_job
+            if app_globals.livestream_job:
+                globals()["livestream_job"] = app_globals.livestream_job
                 print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
             else:
                 print("[UPDATE_CAMERA_SETTINGS] Restart failed — camera unavailable.")
@@ -562,30 +562,32 @@ def update_photo_settings(request):
 
 
 def pause_livestream():
-    with livestream_resume_lock:
-        if livestream_job.running:
-            livestream_job.stop()
+    global app_globals
+    with app_globals.livestream_resume_lock:
+        if app_globals.livestream_job and app_globals.livestream_job.running:
+            app_globals.livestream_job.stop()
             print("[PHOTO] Livestream was paused for photo capture.")
             time.sleep(0.5)
 
 
 def resume_livestream():
-    with livestream_resume_lock:
-        if livestream_job.running:
+    global app_globals
+    with app_globals.livestream_resume_lock:
+        if app_globals.livestream_job and app_globals.livestream_job.running:
             return
         print("[PHOTO] Waiting for camera release...")
         time.sleep(1.5)
 
         for attempt in range(3):
-            with livestream_resume_lock:
-                if not livestream_job.running:
-                    livestream_job.start()
+            with app_globals.livestream_resume_lock:
+                if not app_globals.livestream_job.running:
+                    app_globals.livestream_job.start()
             time.sleep(1.0)
-            if livestream_job.running and livestream_job.get_frame() is not None:
+            if app_globals.livestream_job and app_globals.livestream_job.running and app_globals.livestream_job.get_frame() is not None:
                 print("[PHOTO] Livestream restarted successfully.")
                 return
             print(f"[PHOTO] Livestream restart failed (attempt {attempt + 1})")
-            livestream_job.stop()
+            app_globals.livestream_job.stop()
             time.sleep(1.5)
 
         print("[PHOTO] Livestream could not be restarted.")
@@ -595,12 +597,15 @@ def resume_livestream():
 @require_POST
 @login_required
 def take_photo_now(request):
-    with camera_lock:
+    global app_globals
+    with app_globals.camera_lock:
         pause_livestream()
         try:
-            success = take_photo()
-            if not success:
+            photo_path = take_photo()
+            if not photo_path or not os.path.exists(photo_path):
                 return JsonResponse({"status": "Camera could not be opened."}, status=500)
+            return JsonResponse({"status": "ok", "file": photo_path})
+
         finally:
             resume_livestream()
     return JsonResponse({"status": "ok"})
@@ -620,24 +625,25 @@ def auto_photo_settings(request):
 @require_POST
 @login_required
 def auto_photo_adjust(request):
+    global app_globals
     settings = get_camera_settings()
 
     if not settings:
         return JsonResponse({"status": "no settings found"}, status=500)
 
-    with latest_frame_lock:
-        frame = latest_frame.copy() if latest_frame is not None else None
+    with app_globals.latest_frame_lock:
+        frame = app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
 
     if frame is not None:
         auto_adjust_from_frame(frame, settings)
         return JsonResponse({"status": "adjusted from live frame"})
 
     print("[AUTO-ADJUST] No live frame, capturing temp image.")
-    if not camera or not camera.cap or not camera.cap.isOpened():
+    if not app_globals.camera or not app_globals.camera.cap or not app_globals.camera.cap.isOpened():
         return JsonResponse({"status": "camera not available"}, status=500)
 
-    apply_cv_settings(camera, settings, mode="video")
-    ret, temp_frame = camera.cap.read()
+    apply_cv_settings(app_globals.camera, settings, mode="video")
+    ret, temp_frame = app_globals.camera.cap.read()
     time.sleep(0.3)
 
     if not ret or temp_frame is None:
@@ -660,20 +666,21 @@ def photo_settings_page(request):
 @login_required
 @require_POST
 def manual_restart_camera(request):
-    global livestream_job
+    global app_globals
 
-    livestream_job = safe_restart_camera_stream(
+    app_globals.livestream_job = safe_restart_camera_stream(
         frame_callback=lambda f: update_latest_frame(f),
         camera_source=CAMERA_URL
     )
 
-    globals()["livestream_job"] = livestream_job
+    globals()["livestream_job"] = app_globals.livestream_job
     return redirect("stream_page")
 
 
 def wait_until_camera_available(device_index=0, max_attempts=5, delay=1.0):
+    global app_globals
     for attempt in range(max_attempts):
-        if camera and camera.is_available():
+        if app_globals.camera and app_globals.camera.is_available():
             print(f"[CAMERA_UTIL] CameraManager reports device available.")
             return True
         print(f"[CAMERA_UTIL] Waiting for camera... attempt {attempt+1}/{max_attempts}")
