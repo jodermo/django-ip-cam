@@ -5,7 +5,7 @@ import cv2
 import time
 import threading
 from cameraapp.models import CameraSettings
-from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe
+from .camera_utils import get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe
 from .globals import camera_lock, camera_capture
 
 from dotenv import load_dotenv
@@ -95,8 +95,10 @@ def apply_video_settings(cap):
 
     if settings.video_exposure_mode == "auto":
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+        time.sleep(0.5)
     else:
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        time.sleep(0.5)
 
 
     for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
@@ -180,4 +182,5 @@ def apply_photo_settings(camera, settings):
 
 def enable_auto_exposure(cap):
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+    time.sleep(0.5)
 

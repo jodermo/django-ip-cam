@@ -61,11 +61,12 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     exposure_mode = getattr(settings, f"{prefix}exposure_mode", "manual").lower()
     if exposure_mode == "auto":
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+        time.sleep(0.5)
         print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = AUTO")
     else:
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
         print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = MANUAL")
-        time.sleep(0.3)  # wichtig: Kamera braucht Pause nach Mode-Wechsel
+        time.sleep(0.5)
 
     def apply_param(name, min_valid=-1.0, max_valid=100.0, skip_if_auto=False):
         try:
@@ -305,3 +306,14 @@ def force_device_reset(device="/dev/video0"):
         print("[RESET] USB device re-enabled.")
     except Exception as e:
         print(f"[RESET] USB reset failed: {e}")
+
+
+def release_and_reset_camera():
+    if camera_instance and camera_instance.isOpened():
+        camera_instance.release()
+        print("[RELEASE] Camera released.")
+        time.sleep(1.0)
+
+    force_device_reset("/dev/video0")
+    gc.collect()
+    time.sleep(1.5)

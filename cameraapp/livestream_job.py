@@ -2,7 +2,7 @@ import threading
 import time
 import logging
 from typing import Callable, Optional, Union
-
+from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings, force_device_reset
 from .globals import livestream_lock
 
 logger = logging.getLogger(__name__)
@@ -112,8 +112,6 @@ class LiveStreamJob:
 
     def _connect_with_retries(self):
         """Attempts to open the camera with exponential backoff."""
-        from .camera_utils import try_open_camera, apply_cv_settings, get_camera_settings
-
         delay = self.base_delay
         for attempt in range(1, self.max_retries + 1):
             logger.info(f"[LIVE] Connecting to {self.camera_source}, attempt {attempt}")
@@ -129,6 +127,14 @@ class LiveStreamJob:
             delay *= 2
 
         logger.error(f"[LIVE] Could not open camera after {self.max_retries} attempts")
+
+        try:
+            logger.warning("[LIVE] Performing fallback: force_device_reset")
+            force_device_reset("/dev/video0")
+            time.sleep(1.5)
+        except Exception as e:
+            logger.error(f"[LIVE] force_device_reset failed: {e}")
+
         return None
 
     def _cleanup(self) -> None:

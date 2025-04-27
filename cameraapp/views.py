@@ -27,7 +27,8 @@ from .models import CameraSettings
 from .camera_core import (
     init_camera, reset_to_default,
     apply_photo_settings, apply_auto_settings, auto_adjust_from_frame, try_open_camera_safe,
-    try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream, get_camera_settings_safe
+    try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream, get_camera_settings_safe,
+    release_and_reset_camera
 )
 from .camera_utils import safe_restart_camera_stream
 from .globals import (
@@ -142,7 +143,7 @@ def reset_camera_settings(request):
 
             # 2. Gib Kamera frei
             if camera_instance and camera_instance.isOpened():
-                camera_instance.release()
+                release_and_reset_camera()
                 print("[RESET_CAMERA_SETTINGS] Kamera freigegeben.")
                 for i in range(5):
                     if os.path.exists("/dev/video0"):
@@ -179,6 +180,7 @@ def reset_camera_settings(request):
             print(f"[RESET_CAMERA_SETTINGS] Fehler beim Neustart: {e}")
 
     return HttpResponseRedirect(reverse("settings_view"))
+
 
 
 def generate_frames():
@@ -256,7 +258,7 @@ def stream_page(request):
             time.sleep(1.0)
 
             if camera_instance and camera_instance.isOpened():
-                camera_instance.release()
+                release_and_reset_camera()
                 print("[RELEASE] Camera released. Verifiziere Freigabe...")
                 for i in range(5):
                     if os.path.exists("/dev/video0"):
@@ -509,6 +511,7 @@ def media_browser(request):
     return render(request, "cameraapp/media_browser.html", {"media_tree": media_tree, "title": "Media Browser"})
 
 
+@csrf_exempt
 @require_POST
 @login_required
 def update_camera_settings(request):
@@ -565,7 +568,7 @@ def update_camera_settings(request):
 
             # Release camera instance safely
             if camera_instance and camera_instance.isOpened():
-                camera_instance.release()
+                release_and_reset_camera()
                 print("[RELEASE] Camera released. Verifiziere Freigabe...")
                 for i in range(5):
                     if os.path.exists("/dev/video0"):
@@ -581,7 +584,6 @@ def update_camera_settings(request):
                     time.sleep(1.0)
                 else:
                     print("[RELEASE] Kamera nach 5 Versuchen nicht freigegeben. Fortfahren mit Risiko.")
-
 
             # Restart using robust helper
             print("[DEBUG] Calling safe_restart_camera_stream...")
@@ -606,7 +608,7 @@ def update_camera_settings(request):
     return HttpResponseRedirect(reverse("stream_page"))
 
 
-
+@csrf_exempt
 @require_POST
 @login_required
 def update_photo_settings(request):
@@ -666,7 +668,7 @@ def resume_livestream():
         print("[PHOTO] Livestream could not be restarted.")
 
 
-
+@csrf_exempt
 @require_POST
 @login_required
 def take_photo_now(request):
@@ -680,7 +682,7 @@ def take_photo_now(request):
             resume_livestream()
     return JsonResponse({"status": "ok"})
 
-
+@csrf_exempt
 @require_POST
 @login_required
 def auto_photo_settings(request):
@@ -691,7 +693,7 @@ def auto_photo_settings(request):
     apply_auto_settings(settings)
     return JsonResponse({"success": True, "message": "Auto settings applied."})
 
-
+@csrf_exempt
 @require_POST
 @login_required
 def auto_photo_adjust(request):
@@ -726,6 +728,7 @@ def auto_photo_adjust(request):
     auto_adjust_from_frame(temp_frame, settings)
     return JsonResponse({"status": "adjusted from temp photo"})
 
+@csrf_exempt
 @login_required
 def photo_settings_page(request):
     settings_obj = get_camera_settings()
@@ -734,7 +737,7 @@ def photo_settings_page(request):
         "title": "Foto-Einstellungen"
     })
 
-
+@csrf_exempt
 @login_required
 @require_POST
 def manual_restart_camera(request):
