@@ -101,66 +101,6 @@ def reboot_pi(request):
 
 
 
-@csrf_exempt
-@require_POST
-@login_required
-def reset_camera_settings(request):
-    global camera_instance, livestream_job
-
-    try:
-        settings_obj = get_camera_settings_safe(connection)
-        if not settings_obj:
-            print("[RESET_CAMERA_SETTINGS] Kein CameraSettings-Objekt gefunden.")
-            return HttpResponseRedirect(reverse("settings_view"))
-
-        print("[RESET_CAMERA_SETTINGS] Zurücksetzen auf Default-Werte...")
-
-        settings_obj.video_brightness = 128.0
-        settings_obj.video_contrast = 32.0
-        settings_obj.video_saturation = 64.0
-        settings_obj.video_exposure = -6.0
-        settings_obj.video_gain = 4.0
-        settings_obj.video_exposure_mode = "auto"
-        settings_obj.save()
-
-        print("[RESET_CAMERA_SETTINGS] Defaults gespeichert.")
-
-    except Exception as e:
-        print(f"[RESET_CAMERA_SETTINGS] Fehler beim Zurücksetzen: {e}")
-        return HttpResponseRedirect(reverse("settings_view"))
-
-    if not livestream_job:
-        print("[RESET_CAMERA_SETTINGS] Kein aktiver Livestream-Job.")
-        return HttpResponseRedirect(reverse("settings_view"))
-
-    with camera_lock:
-        try:
-            livestream_job.stop()
-            livestream_job.join(timeout=2.0)
-            print("[RESET_CAMERA_SETTINGS] Livestream gestoppt.")
-
-            release_and_reset_camera()
-            print("[RESET_CAMERA_SETTINGS] Kamera freigegeben.")
-
-            livestream_job = safe_restart_camera_stream(
-                livestream_job_ref=None,  # wichtig
-                camera_url=CAMERA_URL,
-                frame_callback=lambda f: update_latest_frame(f),
-                retries=3,
-                delay=1.5
-            )
-
-            if livestream_job:
-                globals()["livestream_job"] = livestream_job
-                print("[RESET_CAMERA_SETTINGS] Kamera erfolgreich neu gestartet.")
-            else:
-                print("[RESET_CAMERA_SETTINGS] Neustart fehlgeschlagen.")
-
-        except Exception as e:
-            print(f"[RESET_CAMERA_SETTINGS] Fehler beim Neustart: {e}")
-
-    return HttpResponseRedirect(reverse("settings_view"))
-
 
 def generate_frames():
     """
@@ -489,6 +429,68 @@ def media_browser(request):
     ]
     return render(request, "cameraapp/media_browser.html", {"media_tree": media_tree, "title": "Media Browser"})
 
+
+@csrf_exempt
+@require_POST
+@login_required
+def reset_camera_settings(request):
+    global camera_instance, livestream_job
+
+    try:
+        settings_obj = get_camera_settings_safe(connection)
+        if not settings_obj:
+            print("[RESET_CAMERA_SETTINGS] Kein CameraSettings-Objekt gefunden.")
+            return HttpResponseRedirect(reverse("settings_view"))
+
+        print("[RESET_CAMERA_SETTINGS] Zurücksetzen auf Default-Werte...")
+
+        settings_obj.video_brightness = 128.0
+        settings_obj.video_contrast = 32.0
+        settings_obj.video_saturation = 64.0
+        settings_obj.video_exposure = -6.0
+        settings_obj.video_gain = 4.0
+        settings_obj.video_exposure_mode = "auto"
+        settings_obj.save()
+
+        print("[RESET_CAMERA_SETTINGS] Defaults gespeichert.")
+
+    except Exception as e:
+        print(f"[RESET_CAMERA_SETTINGS] Fehler beim Zurücksetzen: {e}")
+        return HttpResponseRedirect(reverse("settings_view"))
+
+    if not livestream_job:
+        print("[RESET_CAMERA_SETTINGS] Kein aktiver Livestream-Job.")
+        return HttpResponseRedirect(reverse("settings_view"))
+
+    with camera_lock:
+        try:
+            livestream_job.stop()
+            livestream_job.join(timeout=2.0)
+            print("[RESET_CAMERA_SETTINGS] Livestream gestoppt.")
+
+            release_and_reset_camera()
+            camera_instance = None  # <<< wichtig
+            print("[RESET_CAMERA_SETTINGS] Kamera freigegeben.")
+
+            livestream_job = safe_restart_camera_stream(
+                livestream_job_ref=livestream_job,
+                camera_url=CAMERA_URL,
+                frame_callback=lambda f: update_latest_frame(f),
+                retries=3,
+                delay=1.5
+            )
+
+            if livestream_job:
+                globals()["livestream_job"] = livestream_job
+                print("[RESET_CAMERA_SETTINGS] Kamera erfolgreich neu gestartet.")
+            else:
+                print("[RESET_CAMERA_SETTINGS] Neustart fehlgeschlagen.")
+
+        except Exception as e:
+            print(f"[RESET_CAMERA_SETTINGS] Fehler beim Neustart: {e}")
+
+    return HttpResponseRedirect(reverse("settings_view"))
+
 @csrf_exempt
 @require_POST
 @login_required
@@ -517,6 +519,7 @@ def update_camera_settings(request):
         if exposure_mode in ["auto", "manual"]:
             settings_obj.video_exposure_mode = exposure_mode
             print(f"[UPDATE_CAMERA_SETTINGS] Set video_exposure_mode = {exposure_mode}")
+
             if exposure_mode == "auto":
                 settings_obj.video_exposure = -1.0
                 print("[UPDATE_CAMERA_SETTINGS] Reset video_exposure to -1.0 due to auto mode")
@@ -536,13 +539,15 @@ def update_camera_settings(request):
         try:
             livestream_job.stop()
             livestream_job.join(timeout=2.0)
-            print("[UPDATE_CAMERA_SETTINGS] Livestream gestoppt.")
+            print("[UPDATE_CAMERA_SETTINGS] Livestream stopped.")
 
             release_and_reset_camera()
-            print("[RELEASE] Kamera freigegeben.")
+            camera_instance = None  # <<< wichtig
+            print("[RELEASE] Camera released.")
 
+            print("[DEBUG] Calling safe_restart_camera_stream...")
             livestream_job = safe_restart_camera_stream(
-                livestream_job_ref=None,  # wichtig
+                livestream_job_ref=livestream_job,
                 camera_url=CAMERA_URL,
                 frame_callback=lambda f: update_latest_frame(f),
                 retries=3,
@@ -552,9 +557,9 @@ def update_camera_settings(request):
 
             if livestream_job:
                 globals()["livestream_job"] = livestream_job
-                print("[UPDATE_CAMERA_SETTINGS] Livestream neu gestartet.")
+                print("[UPDATE_CAMERA_SETTINGS] Livestream restarted.")
             else:
-                print("[UPDATE_CAMERA_SETTINGS] Neustart fehlgeschlagen.")
+                print("[UPDATE_CAMERA_SETTINGS] Restart failed — camera unavailable.")
 
         except Exception as e:
             print(f"[UPDATE_CAMERA_SETTINGS] Error restarting livestream: {e}")
