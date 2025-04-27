@@ -26,7 +26,7 @@ from django.contrib.auth import logout
 from .models import CameraSettings
 from .camera_core import (
     init_camera, reset_to_default,
-    apply_photo_settings, apply_auto_settings, auto_adjust_from_frame,
+    apply_photo_settings, apply_auto_settings, auto_adjust_from_frame, try_open_camera_safe,
     try_open_camera, apply_cv_settings, get_camera_settings, force_restart_livestream, get_camera_settings_safe
 )
 from .camera_utils import safe_restart_camera_stream
@@ -99,6 +99,7 @@ def reboot_pi(request):
 def reset_camera_settings(request):
     if request.method == "POST":
         reset_to_default()
+        time.sleep(0.5)
         init_camera()
     return redirect("settings_view")
 
@@ -190,6 +191,7 @@ def stream_page(request):
 
             if camera_instance and camera_instance.isOpened():
                 camera_instance.release()
+                time.sleep(1.0)
 
             init_camera()
             if livestream_job:
@@ -257,6 +259,7 @@ def record_video(request):
 
 def reset_camera_view(request):
     reset_to_default()
+    time.sleep(0.5)
     init_camera()
     return redirect("settings_page")  # oder wo du zurück willst
 
@@ -471,9 +474,10 @@ def update_camera_settings(request):
 
             if camera_instance and camera_instance.isOpened():
                 camera_instance.release()
+                time.sleep(1.0)
                 print("[UPDATE_CAMERA_SETTINGS] Camera released.")
 
-            new_cap = try_open_camera(CAMERA_URL)
+            new_cap = try_open_camera_safe(CAMERA_URL)
             if not new_cap or not new_cap.isOpened():
                 print("[UPDATE_CAMERA_SETTINGS] Failed to reopen camera.")
                 camera_instance = None

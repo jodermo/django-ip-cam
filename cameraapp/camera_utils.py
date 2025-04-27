@@ -226,3 +226,16 @@ def start_camera_watchdog(interval_sec=10):
                 force_restart_livestream()
 
     threading.Thread(target=watchdog_loop, daemon=True).start()
+
+
+def try_open_camera_safe(source, retries=3, delay=1.0):
+    import gc
+    for attempt in range(retries):
+        cap = cv2.VideoCapture(source)
+        if cap.isOpened():
+            return cap
+        cap.release()
+        gc.collect()
+        print(f"[SAFE_CAMERA] Retry {attempt+1} failed. Waiting {delay}s.")
+        time.sleep(delay)
+    return None
