@@ -119,11 +119,9 @@ class CameraManager:
 
 
     def get_frame(self):
-        if not self.cap or not self.cap.isOpened():
-            print("[CameraManager] get_frame(): cap is not opened")
-            return None
-        ret, frame = self.cap.read()
-        return frame if ret else None
+        with self.lock:
+            return self.frame.copy() if self.frame is not None else None
+
 
     def stop(self):
         print("[CameraManager] Stopping camera")
@@ -138,8 +136,9 @@ class CameraManager:
 
 
 
-    def frame_provider(self):
-        return self.get_frame()
+    def frame_provider():
+        with app_globals.latest_frame_lock:
+            return app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
 
 
     def _wait_for_device_release(self, timeout=5.0):
