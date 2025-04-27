@@ -607,7 +607,11 @@ def pause_livestream():
 
 def resume_livestream():
     global app_globals
-    with app_globals.livestream_resume_lock:
+    if not app_globals.livestream_resume_lock.acquire(timeout=5):
+        print("[PHOTO] Timeout acquiring livestream_resume_lock – skipping resume.")
+        return
+
+    try:
         print("[PHOTO] Attempting to resume livestream...")
 
         if app_globals.livestream_job:
@@ -633,38 +637,40 @@ def resume_livestream():
             print("[PHOTO] Livestream restarted successfully.")
         else:
             print("[PHOTO] Failed to restart livestream.")
+    finally:
+        app_globals.livestream_resume_lock.release()
 
 @csrf_exempt
 @require_POST
 @login_required
 def take_photo_now(request):
     global app_globals
+    photo_path = None
 
     try:
         with app_globals.camera_lock:
             pause_livestream()
 
-            # Neue Kamera-Warte-Logik vor Fallback
-            max_attempts = 6
-            for attempt in range(max_attempts):
+            for attempt in range(6):
                 if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
                     print(f"[PHOTO] Camera ready on attempt {attempt + 1}")
                     break
-                print(f"[PHOTO] Waiting for camera... attempt {attempt + 1}/{max_attempts}")
+                print(f"[PHOTO] Waiting for camera... attempt {attempt + 1}/6")
                 time.sleep(1.0)
             else:
                 print("[PHOTO] Camera not ready after retries.")
                 return JsonResponse({"status": "camera not ready after retries"}, status=500)
 
             photo_path = take_photo()
-
             if not photo_path or not os.path.exists(photo_path):
                 return JsonResponse({"status": "photo capture failed"}, status=500)
 
-            return JsonResponse({"status": "ok", "file": photo_path})
-
     finally:
-        resume_livestream()
+        # Achtung: außerhalb des camera_lock aufrufen
+        threading.Thread(target=resume_livestream, daemon=True).start()
+
+    return JsonResponse({"status": "ok", "file": photo_path})
+
 
 
 @csrf_exempt
