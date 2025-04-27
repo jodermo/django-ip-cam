@@ -11,7 +11,6 @@ import gc
 from django.apps import apps
 from .globals import camera_lock, camera_instance, latest_frame, latest_frame_lock, livestream_resume_lock, livestream_job, taking_foto, camera_capture, active_stream_viewers, last_disconnect_time, recording_timeout
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -114,17 +113,21 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
     # Exposure is sensitive → apply last
     apply_param("exposure", -13.0, -1.0, skip_if_auto=True)
 
+
+
 def try_open_camera(camera_source, retries=3, delay=1.0):
-    import os
+
+
+    device_path = f"/dev/video{camera_source}" if isinstance(camera_source, int) else str(camera_source)
+
     print(f"[DEBUG] try_open_camera: source={camera_source}, retries={retries}, delay={delay}")
-    
     for i in range(retries):
         print(f"[DEBUG] Attempt {i + 1} to open camera...")
 
-        if not os.path.exists("/dev/video0"):
-            print("[DEBUG] /dev/video0 does not exist.")
-        else:
-            print("[DEBUG] /dev/video0 exists.")
+        if isinstance(camera_source, int) and not os.path.exists(device_path):
+            print(f"[DEBUG] /dev/video{camera_source} does not exist.")
+            time.sleep(delay)
+            continue
 
         cap = cv2.VideoCapture(camera_source, cv2.CAP_V4L2)
         if cap.isOpened():
@@ -132,11 +135,12 @@ def try_open_camera(camera_source, retries=3, delay=1.0):
             return cap
         else:
             print("[DEBUG] Camera not opened, retrying...")
-            cap.release()
+        cap.release()
         time.sleep(delay)
 
     print("[DEBUG] All attempts failed. Returning None.")
     return None
+
 
 def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, retries: int = 3, delay: float = 2.0):
     """
