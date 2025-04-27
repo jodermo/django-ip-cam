@@ -1,6 +1,8 @@
 import os
 import cv2
 import time
+# camera_core.py
+import cv2
 import threading
 from django.apps import apps
 from .globals import camera_lock, latest_frame, latest_frame_lock
@@ -12,6 +14,8 @@ CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
 CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
 camera_instance = None
+camera_capture = None
+camera_lock = threading.Lock()
 
 def try_open_camera(camera_source, retries=3, delay=1.0):
     import cv2
@@ -35,49 +39,46 @@ def try_open_camera(camera_source, retries=3, delay=1.0):
 def get_camera_settings():
     return CameraSettings.objects.first()
 
-def init_camera():
-    global camera_instance
-    from cameraapp.models import CameraSettings
 
+def init_camera():
+    global camera_capture
     with camera_lock:
         print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
 
-        if camera_instance:
+        if camera_capture:
             print("[CAMERA_CORE] Releasing previous camera instance.")
-            camera_instance.release()
+            camera_capture.release()
             time.sleep(1.0)
 
         print(f"[CAMERA_CORE] Attempting to open camera from source: {CAMERA_URL}")
-        camera_instance = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
+        camera_capture = try_open_camera(CAMERA_URL, retries=3, delay=2.0)
 
-        if not camera_instance or not camera_instance.isOpened():
+        if not camera_capture or not camera_capture.isOpened():
             print("[CAMERA_CORE] Failed to open camera after retries.")
             return
 
         print("[CAMERA_CORE] Camera opened successfully.")
 
-        try:
-            settings = CameraSettings.objects.first()
-            if not settings:
-                print("[CAMERA_CORE] No CameraSettings in DB.")
-                return
+        settings = get_camera_settings()
+        if not settings:
+            print("[CAMERA_CORE] No CameraSettings found in DB.")
+            return
 
-            if getattr(settings, "video_exposure_mode", "manual") == "auto":
-                print("[CAMERA_CORE] Setting exposure mode to AUTO.")
-                camera_instance.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
-            else:
-                print("[CAMERA_CORE] Setting exposure mode to MANUAL.")
-                camera_instance.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        exposure_mode = getattr(settings, "video_exposure_mode", "manual")
+        if exposure_mode == "auto":
+            print("[CAMERA_CORE] Setting exposure mode to AUTO.")
+            camera_capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+        else:
+            print("[CAMERA_CORE] Setting exposure mode to MANUAL.")
+            camera_capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
 
-            apply_cv_settings(
-                camera_instance,
-                settings,
-                mode="video",
-                reopen_callback=lambda: try_open_camera(CAMERA_URL)
-            )
+        apply_cv_settings(
+            camera_capture,
+            settings,
+            mode="video",
+            reopen_callback=lambda: try_open_camera(CAMERA_URL)
+        )
 
-        except Exception as e:
-            print(f"[CAMERA_CORE] Exception while applying settings: {e}")
 
 
 def reset_to_default():
@@ -251,6 +252,15 @@ def apply_auto_settings(settings):
     settings.photo_gain = -1
     settings.save()
     print("[CAMERA_CORE] Auto photo settings applied (mode=auto, all = -1)")
+
+
+
+def get_shared_camera():
+    global camera_capture
+    with camera_lock:
+        if camera_capture is None or not camera_capture.isOpened():
+            camera_capture = cv2.VideoCapture(0)
+        return camera_capture
 
 
 def auto_adjust_from_frame(frame, settings):

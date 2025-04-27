@@ -1,5 +1,4 @@
 # cameraapp/scheduler.py
-import threading
 import os
 import time
 import cv2
@@ -7,7 +6,9 @@ from datetime import datetime
 from django.conf import settings
 from django.apps import apps
 from django.db import connections
-from .camera_core import apply_cv_settings
+from .globals import latest_frame, latest_frame_lock
+from .camera_core import apply_cv_settings, get_camera_settings
+import numpy as np
 
 # Ensure photo directory exists
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
@@ -19,29 +20,44 @@ def get_camera_settings():
     return CameraSettings.objects.first()
 
 def take_photo():
-    """Takes a standalone photo using its own camera session."""
-    camera_url_raw = os.getenv("CAMERA_URL", "0")
-    camera_url = int(camera_url_raw) if camera_url_raw.isdigit() else camera_url_raw
+    """Captures photo from shared live frame, or opens camera if not available."""
+    frame = None
 
-    cap = cv2.VideoCapture(camera_url)
-    if not cap.isOpened():
-        print("[PHOTO] Failed to open camera.")
-        return False
+    # Try shared frame first
+    with latest_frame_lock:
+        if latest_frame is not None:
+            frame = latest_frame.copy()
 
-    settings = get_camera_settings()
-    apply_cv_settings(cap, settings, mode="photo")
+    if frame is not None:
+        print("[PHOTO] Using shared live frame.")
+    else:
+        print("[PHOTO] No shared frame. Attempting direct capture.")
+        camera_url_raw = os.getenv("CAMERA_URL", "0")
+        camera_url = int(camera_url_raw) if camera_url_raw.isdigit() else camera_url_raw
+        cap = cv2.VideoCapture(camera_url)
+        if not cap.isOpened():
+            print("[PHOTO] Failed to open camera.")
+            return False
 
-    ret, frame = cap.read()
-    if ret:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
-        cv2.imwrite(filepath, frame)
+        settings = get_camera_settings()
+        apply_cv_settings(cap, settings, mode="photo")
+
+        ret, frame = cap.read()
+        cap.release()
+        if not ret or frame is None:
+            print("[PHOTO] Failed to capture image from camera.")
+            return False
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
+    success = cv2.imwrite(filepath, frame)
+
+    if success:
         print(f"[PHOTO] Saved: {filepath}")
     else:
-        print("[PHOTO] Failed to capture image.")
+        print("[PHOTO] Failed to save image.")
 
-    cap.release()
-    return True
+    return success
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
     """Waits until the specified table is available (e.g., after migrations)."""
