@@ -349,6 +349,8 @@ def stop_recording(request):
         return JsonResponse({"status": "stopping"})
     return JsonResponse({"status": "not active"})
 
+
+
 @csrf_exempt
 @login_required
 def is_recording(request):
