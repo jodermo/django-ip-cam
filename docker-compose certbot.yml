@@ -17,6 +17,22 @@ services:
       - django
     restart: unless-stopped
 
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./nginx/certbot/www:/var/www/certbot
+      - ./nginx/certbot/conf:/etc/letsencrypt
+    entrypoint: /bin/sh -c
+    command: >
+      certbot certonly --non-interactive --webroot
+      --webroot-path=/var/www/certbot
+      --email pi-admin@petzka.com
+      --agree-tos
+      --no-eff-email
+      -d really.dont-use.com
+    restart: unless-stopped
+
   django:
     build: .
     container_name: django_ipcam_web
