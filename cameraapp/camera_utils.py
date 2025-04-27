@@ -13,6 +13,7 @@ from .globals import camera_lock, camera_instance, latest_frame, latest_frame_lo
 
 logger = logging.getLogger(__name__)
 
+open_camera_lock = threading.Lock()
 
 def get_camera_settings():
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
@@ -117,29 +118,29 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
 
 def try_open_camera(camera_source, retries=3, delay=1.0):
 
+    with open_camera_lock:
+        device_path = f"/dev/video{camera_source}" if isinstance(camera_source, int) else str(camera_source)
 
-    device_path = f"/dev/video{camera_source}" if isinstance(camera_source, int) else str(camera_source)
+        print(f"[DEBUG] try_open_camera: source={camera_source}, retries={retries}, delay={delay}")
+        for i in range(retries):
+            print(f"[DEBUG] Attempt {i + 1} to open camera...")
 
-    print(f"[DEBUG] try_open_camera: source={camera_source}, retries={retries}, delay={delay}")
-    for i in range(retries):
-        print(f"[DEBUG] Attempt {i + 1} to open camera...")
+            if isinstance(camera_source, int) and not os.path.exists(device_path):
+                print(f"[DEBUG] /dev/video{camera_source} does not exist.")
+                time.sleep(delay)
+                continue
 
-        if isinstance(camera_source, int) and not os.path.exists(device_path):
-            print(f"[DEBUG] /dev/video{camera_source} does not exist.")
+            cap = cv2.VideoCapture(camera_source, cv2.CAP_V4L2)
+            if cap.isOpened():
+                print("[DEBUG] Camera opened successfully.")
+                return cap
+            else:
+                print("[DEBUG] Camera not opened, retrying...")
+            cap.release()
             time.sleep(delay)
-            continue
 
-        cap = cv2.VideoCapture(camera_source, cv2.CAP_V4L2)
-        if cap.isOpened():
-            print("[DEBUG] Camera opened successfully.")
-            return cap
-        else:
-            print("[DEBUG] Camera not opened, retrying...")
-        cap.release()
-        time.sleep(delay)
-
-    print("[DEBUG] All attempts failed. Returning None.")
-    return None
+        print("[DEBUG] All attempts failed. Returning None.")
+        return None
 
 
 def safe_restart_camera_stream(livestream_job_ref, camera_url, frame_callback, retries: int = 3, delay: float = 2.0):
@@ -340,15 +341,10 @@ def release_and_reset_camera():
     wait_for_camera_device()
 
 
-def wait_for_camera_device(path="/dev/video0", timeout=5):
-    for i in range(timeout):
-        if os.path.exists(path):
-            cap = cv2.VideoCapture(path)
-            if cap.isOpened():
-                cap.release()
-                time.sleep(1.5)
-                print(f"[WAIT] Camera device {path} is available")
-                return True
-        print(f"[WAIT] Camera {path} still busy... attempt {i+1}")
-        time.sleep(1)
+def wait_for_camera_device(device_path="/dev/video0", timeout=5.0):
+    start = time.time()
+    while time.time() - start < timeout:
+        if os.path.exists(device_path) and os.access(device_path, os.R_OK):
+            return True
+        time.sleep(0.2)
     return False
