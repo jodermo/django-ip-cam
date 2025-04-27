@@ -30,8 +30,11 @@ def get_camera_settings_safe(connection):
     return CameraSettings.objects.first()
 
 
-
 def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
+    import time
+    import cv2
+    from .globals import camera_instance
+
     if not settings:
         print("[CAMERA_CORE] No settings provided.")
         return
@@ -45,23 +48,26 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
                 cap = new_cap
                 camera_instance = cap
                 print("[CAMERA_CORE] Camera reopened successfully.")
+            else:
+                print("[CAMERA_CORE] Camera reopen failed.")
+                return
         else:
             print("[CAMERA_CORE] No reopen_callback defined – aborting.")
             return
 
     prefix = "video_" if mode == "video" else "photo_"
 
-    # Set auto-exposure
-    exposure_mode = getattr(settings, f"{prefix}exposure_mode", "manual")
+    # Set auto-exposure mode
+    exposure_mode = getattr(settings, f"{prefix}exposure_mode", "manual").lower()
     if exposure_mode == "auto":
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
         print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = AUTO")
     else:
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
         print(f"[CAMERA_CORE] {mode.upper()} exposure_mode = MANUAL")
-        time.sleep(0.1)
+        time.sleep(0.3)  # wichtig: Kamera braucht Pause nach Mode-Wechsel
 
-    def apply_param(name, min_valid=-1.0, max_valid=100.0):
+    def apply_param(name, min_valid=-1.0, max_valid=100.0, skip_if_auto=False):
         try:
             raw = getattr(settings, f"{prefix}{name}", None)
             if raw is None:
@@ -71,16 +77,16 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
             except (TypeError, ValueError):
                 print(f"[WARNING] Invalid value for {prefix}{name}: {raw}")
                 return
-        except (TypeError, ValueError):
-            print(f"[WARNING] Invalid value for {prefix}{name}")
+        except Exception:
+            print(f"[WARNING] Error accessing {prefix}{name}")
             return
 
-        if name != "exposure" and value < 0:
+        if skip_if_auto and exposure_mode == "auto":
+            print(f"[SKIP] {name} ignored in auto mode.")
+            return
+
+        if value < 0:
             print(f"[CAMERA_CORE] {name} disabled (value={value})")
-            return
-
-        if name == "exposure" and exposure_mode == "auto":
-            print("[SKIP] Exposure ignored in auto mode.")
             return
 
         cap_prop = getattr(cv2, f"CAP_PROP_{name.upper()}", None)
@@ -96,17 +102,17 @@ def apply_cv_settings(cap, settings, mode="video", reopen_callback=None):
         ok = cap.set(cap_prop, value)
         actual = cap.get(cap_prop)
         print(f"[CAMERA_CORE] {mode.upper()} Set {name} = {value} → {'OK' if ok else 'FAIL'}, actual={actual}")
+        if name == "exposure" and exposure_mode == "manual" and (not ok or actual > 0):
+            print(f"[ERROR] Exposure setting likely failed (actual={actual})")
 
+    # Apply all non-exposure parameters first
     apply_param("brightness", 0.0, 255.0)
     apply_param("contrast", 0.0, 255.0)
     apply_param("saturation", 0.0, 255.0)
     apply_param("gain", 0.0, 10.0)
 
-    if exposure_mode == "manual":
-        apply_param("exposure", -13.0, -1.0)
-    else:
-        print("[SKIP] Exposure setting ignored in auto exposure mode.")
-
+    # Exposure is sensitive → apply last
+    apply_param("exposure", -13.0, -1.0, skip_if_auto=True)
 
 
 def try_open_camera(camera_source, retries=3, delay=1.0):
