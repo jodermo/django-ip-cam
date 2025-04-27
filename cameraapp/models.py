@@ -1,3 +1,5 @@
+# cameraapp/models.py
+
 from django.db import models
 
 class Camera(models.Model):

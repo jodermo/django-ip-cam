@@ -1,3 +1,5 @@
+# cameraapp/apps.py
+
 from django.apps import AppConfig
 import os
 import threading

@@ -1,4 +1,4 @@
-# camera_manager.py
+# cameraapp/camera_manager.py
 
 import cv2
 import threading

@@ -1,5 +1,4 @@
 # cameraapp/camera_utils.py
-
 import logging
 import time
 import threading
@@ -18,6 +17,13 @@ logger = logging.getLogger(__name__)
 def get_camera_settings():
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
+
+def get_camera_settings_safe(connection=None):
+    """
+    Safe wrapper around get_camera_settings; included for backward compatibility.
+    """
+    return get_camera_settings()
+
 
 def apply_cv_settings(manager, settings, mode="video"):
     if not settings:
@@ -68,7 +74,33 @@ def apply_cv_settings(manager, settings, mode="video"):
     apply_param("gain", 0.0, 10.0)
     apply_param("exposure", -13.0, -1.0, skip_if_auto=True)
 
-def safe_restart_camera_stream(camera_source, frame_callback):
+
+def try_open_camera(source, backend=cv2.CAP_V4L2):
+    """
+    Attempt to open a camera device; returns a VideoCapture or None.
+    """
+    try:
+        cap = cv2.VideoCapture(source, backend)
+        if cap.isOpened():
+            ret, _ = cap.read()
+            if ret:
+                logger.info(f"Opened camera source {source} successfully")
+                return cap
+        cap.release()
+    except Exception as e:
+        logger.error(f"try_open_camera failed for {source}: {e}")
+    return None
+
+
+def try_open_camera_safe(source):
+    """Safe wrapper for try_open_camera; included for backward compatibility."""
+    return try_open_camera(source)
+
+
+def safe_restart_camera_stream(camera_source, frame_callback, shared_capture=None):
+    """
+    Restart the livestream job safely, preserving capture settings.
+    """
     global livestream_job
 
     logger.info("Starting safe camera stream restart")
@@ -105,7 +137,7 @@ def safe_restart_camera_stream(camera_source, frame_callback):
             job = LiveStreamJob(
                 camera_source=camera_source,
                 frame_callback=frame_callback,
-                shared_capture=manager.cap
+                shared_capture=shared_capture or manager.cap
             )
             job.start()
             time.sleep(0.5)
@@ -121,20 +153,20 @@ def safe_restart_camera_stream(camera_source, frame_callback):
             manager.stop()
             return None
 
-def force_device_reset(device="/dev/video0"):
-    try:
-        real_path = os.path.realpath(device)
-        device_link = os.readlink(f"/sys/class/video4linux/{os.path.basename(real_path)}/device")
-        usb_authorized = os.path.join("/sys/class/video4linux", os.path.basename(real_path), "device", "authorized")
 
-        with open(usb_authorized, "w") as f:
-            f.write("0")
-        time.sleep(1)
-        with open(usb_authorized, "w") as f:
-            f.write("1")
-        logger.info("Device USB reset complete")
-    except Exception as e:
-        logger.warning(f"Device reset failed: {e}")
+def force_restart_livestream():
+    """
+    Alias for backward compatibility: restart the livestream with default parameters.
+    """
+    logger.info("force_restart_livestream called")
+    # Uses environment or existing globals to restart
+    from .globals import latest_frame_lock, latest_frame
+    from .globals import camera_lock, livestream_job
+    return safe_restart_camera_stream(
+        camera_source=os.getenv("CAMERA_URL", 0),
+        frame_callback=lambda f: setattr(__import__('cameraapp.globals', fromlist=['']), 'latest_frame', f.copy())
+    )
+
 
 def release_and_reset_camera():
     global livestream_job
@@ -146,13 +178,11 @@ def release_and_reset_camera():
             livestream_job.stop()
             livestream_job.join(timeout=2)
             livestream_job = None
-        force_device_reset("/dev/video0")
+        force_restart_livestream()
         gc.collect()
         time.sleep(1)
     except Exception as e:
         logger.error(f"Error during camera release/reset: {e}")
-
-
 
 
 def update_livestream_job(new_job):
