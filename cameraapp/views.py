@@ -634,29 +634,28 @@ def resume_livestream():
         else:
             print("[PHOTO] Failed to restart livestream.")
 
-
 @csrf_exempt
 @require_POST
 @login_required
 def take_photo_now(request):
     global app_globals
 
-    with app_globals.camera_lock:
-        pause_livestream()
+    try:
+        with app_globals.camera_lock:
+            pause_livestream()
 
-        # Neue Kamera-Warte-Logik vor Fallback
-        max_attempts = 6
-        for attempt in range(max_attempts):
-            if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
-                print(f"[PHOTO] Camera ready on attempt {attempt + 1}")
-                break
-            print(f"[PHOTO] Waiting for camera... attempt {attempt + 1}/{max_attempts}")
-            time.sleep(1.0)
-        else:
-            resume_livestream()
-            return JsonResponse({"status": "camera not ready after retries"}, status=500)
+            # Neue Kamera-Warte-Logik vor Fallback
+            max_attempts = 6
+            for attempt in range(max_attempts):
+                if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
+                    print(f"[PHOTO] Camera ready on attempt {attempt + 1}")
+                    break
+                print(f"[PHOTO] Waiting for camera... attempt {attempt + 1}/{max_attempts}")
+                time.sleep(1.0)
+            else:
+                print("[PHOTO] Camera not ready after retries.")
+                return JsonResponse({"status": "camera not ready after retries"}, status=500)
 
-        try:
             photo_path = take_photo()
 
             if not photo_path or not os.path.exists(photo_path):
@@ -664,9 +663,8 @@ def take_photo_now(request):
 
             return JsonResponse({"status": "ok", "file": photo_path})
 
-        finally:
-            resume_livestream()
-
+    finally:
+        resume_livestream()
 
 
 @csrf_exempt
