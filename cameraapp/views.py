@@ -29,14 +29,14 @@ from .camera_core import (
     init_camera, reset_to_default,
     apply_auto_settings, auto_adjust_from_frame,
     apply_cv_settings, get_camera_settings, get_camera_settings_safe,
-    release_and_reset_camera, camera, LiveStreamJob
+    release_and_reset_camera, LiveStreamJob
 )
 from .camera_utils import safe_restart_camera_stream
 from .globals import (
     camera_lock, latest_frame, latest_frame_lock,
     livestream_resume_lock, livestream_job, taking_foto,
     active_stream_viewers, last_disconnect_time, recording_timeout,
-    recording_job,
+    recording_job, camera
 )
 from .recording_job import RecordingJob
 from .scheduler import take_photo 

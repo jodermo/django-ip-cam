@@ -18,6 +18,7 @@ def get_camera_settings():
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
 
+
 def get_camera_settings_safe(connection=None):
     """
     Safe wrapper around get_camera_settings; included for backward compatibility.
@@ -97,62 +98,60 @@ def try_open_camera_safe(source):
     return try_open_camera(source)
 
 
-def safe_restart_camera_stream(camera_source, frame_callback, shared_capture=None):
+def safe_restart_camera_stream(frame_callback):
     """
-    Restart the livestream job safely, preserving capture settings.
+    Restart the livestream job using the *single* CameraManager instance.
+    Returns the new LiveStreamJob, or None on failure.
     """
     global livestream_job
 
-    logger.info("Starting safe camera stream restart")
-
     with camera_lock:
+        # 1) Stop existing livestream
         if livestream_job and livestream_job.running:
             try:
                 livestream_job.stop()
-                livestream_job.join(timeout=2)
+                livestream_job.join(timeout=2.0)
                 logger.info("Stopped previous livestream job")
             except Exception as e:
-                logger.warning(f"Error stopping previous livestream job: {e}")
+                logger.warning(f"Error stopping livestream_job: {e}")
             livestream_job = None
 
-        try:
-            manager = CameraManager(source=camera_source)
-            if not manager.cap or not manager.cap.isOpened():
-                logger.error("Failed to open camera after restart")
+        # 2) Ensure camera is alive (reopen if needed)
+        if not camera or not camera.is_available():
+            logger.info("Camera not available, attempting restart")
+            if not camera or not camera.restart():
+                logger.error("CameraManager restart failed")
                 return None
-        except Exception as e:
-            logger.error(f"CameraManager initialization failed: {e}")
-            return None
+            time.sleep(0.5)
 
+        # 3) Re-apply user settings
         settings = get_camera_settings()
         if settings:
             try:
-                apply_cv_settings(manager, settings, mode="video")
+                from .camera_utils import apply_cv_settings
+                apply_cv_settings(camera, settings, mode="video")
+                logger.info("Re-applied CV settings")
             except Exception as e:
-                logger.warning(f"Failed to apply settings: {e}")
-        else:
-            logger.warning("No settings found")
+                logger.warning(f"Failed to apply camera settings: {e}")
 
+        # 4) Start a fresh LiveStreamJob on the shared capture
         try:
-            job = LiveStreamJob(
-                camera_source=camera_source,
+            new_job = LiveStreamJob(
+                camera_source=None,        # unused when shared_capture is given
                 frame_callback=frame_callback,
-                shared_capture=shared_capture or manager.cap
+                shared_capture=camera.cap
             )
-            job.start()
+            new_job.start()
             time.sleep(0.5)
-            if not job.running:
-                logger.error("Livestream job failed to start")
-                manager.stop()
-                return None
-            livestream_job = job
+            if not new_job.running:
+                raise RuntimeError("Livestream job did not start")
+            livestream_job = new_job
             logger.info("Livestream restarted successfully")
-            return job
-        except Exception as e:
-            logger.error(f"Failed to start livestream: {e}")
-            manager.stop()
-            return None
+            return new_job
 
+        except Exception as e:
+            logger.error(f"Failed to start new livestream: {e}")
+            return None
 
 def force_restart_livestream():
     """

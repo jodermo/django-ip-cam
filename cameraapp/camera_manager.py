@@ -153,3 +153,11 @@ class CameraManager:
         return False
 
 
+
+    def restart(self) -> bool:
+        """
+        Try to reopen/releases and reopen the same capture device.
+        Returns True on success.
+        """
+        with self.lock:
+            return self._restart_camera()
