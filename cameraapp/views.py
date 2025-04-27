@@ -29,7 +29,7 @@ from .camera_core import (
     init_camera, reset_to_default,
     apply_auto_settings, auto_adjust_from_frame,
     apply_cv_settings, get_camera_settings, get_camera_settings_safe,
-    release_and_reset_camera, LiveStreamJob
+    release_and_reset_camera
 )
 from .camera_utils import safe_restart_camera_stream
 from .globals import (
@@ -54,17 +54,6 @@ RECORD_DIR = os.path.join(settings.MEDIA_ROOT, "recordings")
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(RECORD_DIR, exist_ok=True)
 os.makedirs(PHOTO_DIR, exist_ok=True)
-
-
-def get_livestream_job(camera_source, frame_callback=None, shared_capture=None):
-    global livestream_job, camera
-    livestream_job = LiveStreamJob(
-        camera_source=camera_source,
-        frame_callback=frame_callback,
-        shared_capture=shared_capture or (camera.cap if camera else None)
-    )
-    globals()["livestream_job"] = livestream_job
-    return livestream_job
 
 
 
@@ -179,11 +168,7 @@ def stream_page(request):
                 if not livestream_job.running:
                     livestream_job.start()
 
-    livestream_job = get_livestream_job(
-        camera_source=CAMERA_URL,
-        frame_callback=lambda f: update_latest_frame(f),
-        shared_capture=camera.cap if camera else None
-    )
+
     globals()["livestream_job"] = livestream_job
     if livestream_job and not livestream_job.running:
         with livestream_resume_lock:
