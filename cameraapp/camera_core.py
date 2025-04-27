@@ -17,6 +17,9 @@ CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
 def init_camera():
     global camera_capture
+    if camera_capture and camera_capture.isOpened():
+        camera_capture.release()
+        time.sleep(1.0)
     with camera_lock:
         print(f"[CAMERA_CORE] Init requested. CAMERA_URL_RAW='{CAMERA_URL_RAW}', resolved='{CAMERA_URL}'")
 
