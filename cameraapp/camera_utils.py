@@ -18,6 +18,8 @@ def get_camera_settings():
     CameraSettings = apps.get_model("cameraapp", "CameraSettings")
     return CameraSettings.objects.first()
 
+def is_camera_device_available(device="/dev/video0"):
+    return os.path.exists(device) and os.access(device, os.R_OK | os.W_OK)
 
 def get_camera_settings_safe(connection=None):
     """
@@ -271,3 +273,6 @@ def start_camera_watchdog(interval_sec=10):
 
     threading.Thread(target=loop, daemon=True).start()
     logger.info("[WATCHDOG] Started camera watchdog thread.")
+
+
+
