@@ -2,6 +2,7 @@
 {% block content %}
 <h1>Media Browser</h1>
 
+<!-- Action Buttons -->
 <form method="post" action="{% url 'delete_all_images' %}" style="display:inline;">
     {% csrf_token %}
     <button type="submit" onclick="return confirm('Delete ALL images?')">🗑️ Delete all images</button>
@@ -12,101 +13,52 @@
     <button type="submit" onclick="return confirm('Delete ALL videos?')">🗑️ Delete all videos</button>
 </form>
 
+<!-- Layout Mode Switch -->
+<div style="margin: 10px 0;">
+  <a href="?view=list"><button {% if layout_mode == "list" %}disabled{% endif %}>List View</button></a>
+  <a href="?view=thumb"><button {% if layout_mode == "thumb" %}disabled{% endif %}>Thumbnail View</button></a>
+</div>
+
+<!-- Media Sections -->
 {% for section in media_tree %}
   <h2>{{ section.label }}</h2>
-  <ul class="tree">
-    {% for item in section.content %}
-        {% include "cameraapp/media_item.html" with item=item section=section %}
-    {% endfor %}
-  </ul>
+
+  {% if layout_mode == "thumb" %}
+    <div class="thumb-grid">
+      {% for item in section.content %}
+        {% if item.type != "dir" %}
+          {% include "cameraapp/media_item.html" with item=item section=section layout="thumb" %}
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <ul class="tree">
+      {% for item in section.content %}
+        {% include "cameraapp/media_item.html" with item=item section=section layout="list" %}
+      {% endfor %}
+    </ul>
+  {% endif %}
 {% endfor %}
 
-<!-- Media Modal -->
-<div id="mediaModal" class="modal" onclick="closePreview()">
-    <div class="modal-content" onclick="event.stopPropagation();">
-      <span class="close-button" onclick="closePreview()">&times;</span>
-      <div id="mediaContent"></div>
-    </div>
+<!-- Modal -->
+<div id="mediaModal" class="modal" onclick="closeModal()">
+  <div class="modal-content" onclick="event.stopPropagation();">
+    <span class="close-button" onclick="closeModal()">&times;</span>
+    <div id="mediaContent"></div>
   </div>
-  
+</div>
 
 <style>
-ul.tree, ul.tree ul {
-    list-style: none;
-    margin: 0;
-    padding-left: 1em;
-    position: relative;
-}
-ul.tree ul {
-    display: none;
-}
-ul.tree li::before {
-    content: "▶";
-    display: inline-block;
-    width: 1em;
-    cursor: pointer;
-}
-ul.tree li.expanded > ul {
-    display: block;
-}
-ul.tree li.expanded::before {
-    content: "▼";
-}
-
-
-.media-row {
-  display: grid;
-  grid-template-columns: 30px 1fr 200px 80px;
-  padding: 4px 8px;
-  border-bottom: 1px solid #ccc;
-  align-items: center;
-  font-family: monospace;
-  font-size: 14px;
-  cursor: default;
-}
-.folder-row {
-  font-weight: bold;
-  background: #f5f5f5;
-}
-.file-row:hover {
-  background: #eaf2ff;
-}
-.media-row .icon {
-  text-align: center;
-}
-.media-row .name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.media-row .actions button {
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-ul.tree, ul.tree ul {
-  list-style: none;
-  margin: 0;
-  padding-left: 1em;
-}
-ul.tree ul {
-  display: none;
-}
-ul.tree li.expanded > ul {
-  display: block;
-}
+/* Modal */
 .modal {
   display: none;
   position: fixed;
   z-index: 999;
   left: 0; top: 0;
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   background-color: rgba(0,0,0,0.7);
-  align-items: center;
-  justify-content: center;
+  align-items: center; justify-content: center;
 }
-
 .modal-content {
   background-color: #111;
   padding: 20px;
@@ -114,79 +66,77 @@ ul.tree li.expanded > ul {
   max-width: 90%;
   max-height: 90%;
   box-shadow: 0 0 15px rgba(0,0,0,0.5);
-  position: relative;
-  text-align: center;
+  position: relative; text-align: center;
 }
-
 .close-button {
   position: absolute;
-  top: 10px;
-  right: 16px;
+  top: 10px; right: 16px;
   font-size: 28px;
   color: #fff;
   cursor: pointer;
 }
 
-.media-row .icon {
-  font-size: 16px;
-  text-align: center;
-  width: 30px;
+/* Tree View */
+ul.tree, ul.tree ul {
+  list-style: none;
+  margin: 0; padding-left: 1em;
 }
-
-.file-row {
+ul.tree ul { display: none; }
+ul.tree li::before {
+  content: "▶";
+  display: inline-block;
+  width: 1em;
   cursor: pointer;
 }
+ul.tree li.expanded > ul { display: block; }
+ul.tree li.expanded::before { content: "▼"; }
 
-
+/* Media Rows */
 .media-row {
   display: grid;
-  grid-template-columns: 30px 1fr 160px 100px 80px; /* Icon | Name | Date | Size | Actions */
+  grid-template-columns: 30px 1fr 160px 100px 80px;
   padding: 4px 8px;
   border-bottom: 1px solid #ccc;
   align-items: center;
   font-family: monospace;
   font-size: 14px;
 }
+.folder-row { font-weight: bold; background: #f5f5f5; }
+.file-row:hover { background: #eaf2ff; }
+.media-row .icon, .date, .size, .actions { text-align: left; }
+.media-row .size { font-size: 12px; color: #666; }
 
-.media-row .icon,
-.media-row .date,
-.media-row .size,
-.media-row .actions {
-  text-align: left;
+/* Thumbnail Grid */
+.thumb-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px;
 }
-
-.media-row .size {
+.thumb-item {
+  width: 160px;
   font-size: 12px;
-  color: #666;
+  font-family: monospace;
+  text-align: center;
+  cursor: pointer;
+  background: #f8f8f8;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+.thumb-item:hover { background: #e8eefc; }
+.thumb-icon img, .thumb-icon video {
+  width: 100%;
+  max-height: 100px;
+  object-fit: cover;
+  border-radius: 4px;
 }
 </style>
 
 <script>
 function showMediaModal(type, url) {
-    const content = document.getElementById("mediaContent");
-    content.innerHTML = "";
-
-    if (type === "image") {
-        const img = document.createElement("img");
-        img.src = url;
-        img.style.maxWidth = "100%";
-        img.style.maxHeight = "80vh";
-        content.appendChild(img);
-    } else if (type === "video") {
-        const vid = document.createElement("video");
-        vid.src = url;
-        vid.controls = true;
-        vid.style.maxWidth = "100%";
-        vid.style.maxHeight = "80vh";
-        content.appendChild(vid);
-    }
-
-    document.getElementById("mediaModal").style.display = "flex";
-}
-function openPreview(type, url) {
   const content = document.getElementById("mediaContent");
   content.innerHTML = "";
-
   if (type === "image") {
     const img = document.createElement("img");
     img.src = url;
@@ -202,55 +152,41 @@ function openPreview(type, url) {
     vid.style.maxHeight = "80vh";
     content.appendChild(vid);
   }
-
   document.getElementById("mediaModal").style.display = "flex";
 }
-
-function closePreview() {
-  document.getElementById("mediaModal").style.display = "none";
-}
 function closeModal() {
-    document.getElementById("mediaModal").style.display = "none";
-    document.getElementById("mediaContent").innerHTML = "";
+  document.getElementById("mediaModal").style.display = "none";
+  document.getElementById("mediaContent").innerHTML = "";
 }
-
 document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("ul.tree li").forEach(function (li) {
-        const hasChildren = li.querySelector("ul");
-        if (hasChildren) {
-            li.classList.add("collapsible");
-            li.addEventListener("click", function (e) {
-                if (e.target === li || e.target.tagName === "STRONG") {
-                    li.classList.toggle("expanded");
-                    e.stopPropagation();
-                }
-            });
+  document.querySelectorAll("ul.tree li").forEach(function (li) {
+    const hasChildren = li.querySelector("ul");
+    if (hasChildren) {
+      li.classList.add("collapsible");
+      li.addEventListener("click", function (e) {
+        if (e.target === li || e.target.tagName === "STRONG") {
+          li.classList.toggle("expanded");
+          e.stopPropagation();
         }
-    });
+      });
+    }
+  });
 
-    // doppelklick für Datei-Vorschau
-    document.querySelectorAll("ul.tree li").forEach(function (li) {
-        li.addEventListener("dblclick", function (e) {
-            if (li.classList.contains("file-row")) {
-                const img = li.querySelector("img");
-                const video = li.querySelector("video");
-
-                if (img) {
-                    showMediaModal("image", img.src);
-                } else if (video) {
-                    const source = video.querySelector("source");
-                    if (source) {
-                        showMediaModal("video", source.src);
-                    }
-                }
-            }
-            e.stopPropagation();
-        });
+  document.querySelectorAll("ul.tree li").forEach(function (li) {
+    li.addEventListener("dblclick", function (e) {
+      if (li.classList.contains("file-row")) {
+        const img = li.querySelector("img");
+        const video = li.querySelector("video");
+        if (img) {
+          showMediaModal("image", img.src);
+        } else if (video) {
+          const source = video.querySelector("source");
+          if (source) showMediaModal("video", source.src);
+        }
+      }
+      e.stopPropagation();
     });
+  });
 });
-
-
-
-
 </script>
 {% endblock %}

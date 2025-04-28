@@ -1,4 +1,4 @@
-<li class="media-row {% if item.type == 'dir' %}folder-row{% else %}file-row{% endif %}">
+<li class="media-row {% if item.type == 'dir' %}folder-row{% else %}file-row{% endif %}" data-name="{{ item.name }}" data-type="{{ item.type }}" data-url="{{ item.url }}">
   <div class="icon">
     {% if item.type == "dir" %}📁{% elif item.type == "image" %}🖼️{% elif item.type == "video" %}🎞️{% endif %}
   </div>

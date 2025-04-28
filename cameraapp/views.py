@@ -384,6 +384,8 @@ class CameraSettingsForm(forms.ModelForm):
 
 @login_required
 def media_browser(request):
+    layout_mode = request.GET.get("view", "list")  # default = list
+
     def collect_files(base_url, base_path):
         result = []
         if os.path.exists(base_path):
@@ -400,12 +402,14 @@ def media_browser(request):
                     ext = fname.split(".")[-1].lower()
                     file_type = "video" if ext in ["mp4", "avi", "mov"] else "image"
                     mtime = datetime.datetime.fromtimestamp(os.path.getmtime(full_path))
+                    size = os.path.getsize(full_path)
                     result.append({
                         "type": file_type,
                         "name": fname,
                         "url": url_path,
                         "mtime": mtime,
-                        "path": full_path, 
+                        "size": size,
+                        "path": full_path,
                     })
         return result
 
@@ -413,7 +417,11 @@ def media_browser(request):
         {"label": "Recordings", "path": "/media/recordings", "content": collect_files("/media/recordings", RECORD_DIR)},
         {"label": "Photos", "path": "/media/photos", "content": collect_files("/media/photos", PHOTO_DIR)}
     ]
-    return render(request, "cameraapp/media_browser.html", {"media_tree": media_tree, "title": "Media Browser"})
+    return render(request, "cameraapp/media_browser.html", {
+        "media_tree": media_tree,
+        "layout_mode": layout_mode,
+        "title": "Media Browser"
+    })
 
 
 @csrf_exempt
