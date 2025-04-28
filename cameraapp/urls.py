@@ -25,4 +25,7 @@ urlpatterns = [
     path("manual_restart_camera/", views.manual_restart_camera, name="manual_restart_camera"),
     path("camera_status/", views.camera_status, name="camera_status"),
     path("frame/", views.single_frame, name="single_frame"),
+    path("media/delete/", views.delete_media_file, name="delete_media_file"),
+    path("media/delete_all_images/", views.delete_all_images, name="delete_all_images"),
+    path("media/delete_all_videos/", views.delete_all_videos, name="delete_all_videos"),
 ]

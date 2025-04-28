@@ -7,23 +7,29 @@
           {% include "cameraapp/media_item.html" with item=child %}
         {% endfor %}
       </ul>
-    {% elif item.type == "image" %}
-      <div class="file-entry">
-        <p style="color: orange;">[DEBUG] {{ item.name }} | {{ item.url }} | {{ item.type }}</p>
+    {% endif %}
 
-        <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
-        <img src="{{ item.url }}" width="320" style="margin-bottom: 10px;" />
-      </div>
-    {% elif item.type == "video" %}
+    {% if item.type == "image" or item.type == "video" %}
       <div class="file-entry">
-        <p style="color: orange;">[DEBUG] {{ item.name }} | {{ item.url }} | {{ item.type }}</p>
-
         <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
-        <video width="320" controls style="margin-bottom: 10px;">
-          <source src="{{ item.url }}" type="video/mp4">
-          Your browser does not support the video tag.
-        </video>
+
+        {% if item.type == "image" %}
+          <img src="{{ item.url }}" width="320" style="margin-bottom: 10px;" />
+        {% elif item.type == "video" %}
+          <video width="320" controls style="margin-bottom: 10px;">
+            <source src="{{ item.url }}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+        {% endif %}
+
+        <form method="post" action="{% url 'delete_media_file' %}" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="file_path" value="{{ section.label|lower }}/{{ item.name }}">
+          <button type="submit" onclick="return confirm('Delete {{ item.name }}?')">🗑️ Delete</button>
+        </form>
       </div>
     {% endif %}
+
+
   </li>
   

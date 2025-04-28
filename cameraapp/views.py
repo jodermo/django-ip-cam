@@ -23,6 +23,7 @@ from django import forms
 from django.apps import apps
 from django.db import connection
 from django.contrib.auth import logout
+from django.contrib import messages
 
 
 from .models import CameraSettings
@@ -402,7 +403,8 @@ def media_browser(request):
                         "type": file_type,
                         "name": fname,
                         "url": url_path,
-                        "mtime": mtime
+                        "mtime": mtime,
+                        "path": full_path, 
                     })
         return result
 
@@ -799,3 +801,38 @@ def wait_until_camera_available(device_index=0, max_attempts=5, delay=1.0):
     return False
 
 
+
+@csrf_exempt
+def delete_media_file(request):
+    if request.method == "POST":
+        rel_path = request.POST.get("file_path")
+        if not rel_path:
+            messages.warning(request, "No file path provided.")
+            return redirect("media_browser")
+
+        # Auflösen in absoluten Pfad
+        abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+
+        if os.path.exists(abs_path):
+            try:
+                os.remove(abs_path)
+                messages.success(request, f"{os.path.basename(abs_path)} deleted.")
+            except Exception as e:
+                messages.error(request, f"Failed to delete {abs_path}: {e}")
+        else:
+            messages.warning(request, f"File not found: {rel_path}")
+
+    return redirect("media_browser")
+
+
+def delete_all_images(request):
+    base_path = os.path.join(settings.MEDIA_ROOT, "photos")
+    for f in glob.glob(os.path.join(base_path, "*.jpg")):
+        os.remove(f)
+    return redirect("media_browser")
+
+def delete_all_videos(request):
+    base_path = os.path.join(settings.MEDIA_ROOT, "videos")
+    for f in glob.glob(os.path.join(base_path, "*.mp4")):
+        os.remove(f)
+    return redirect("media_browser")
