@@ -266,7 +266,7 @@
       headers: { 'X-CSRFToken': '{{ csrf_token }}' }
     }).then(res => res.json()).then(data => {
       alert(data.status || "Photo taken");
-      window.location.href = "/gallery/"; 
+      window.location.href = "/foto_view/"; 
     });
   }
 

@@ -147,7 +147,7 @@ def stream_page(request):
     except Exception as e:
         print(f"[STREAM_PAGE] Failed to initialize camera: {e}")
         camera_error = "Kamera konnte nicht initialisiert werden."
-        return render(request, "cameraapp/stream.html", {
+        return render(request, "cameraapp/video_view.html", {
             "camera_error": camera_error,
             "title": "Live Stream",
             "viewer_count": app_globals.active_stream_viewers,
@@ -167,7 +167,7 @@ def stream_page(request):
     except Exception as e:
         print(f"[STREAM_PAGE] Livestream konnte nicht gestartet werden: {e}")
         camera_error = "Kamera konnte nicht gestartet werden."
-        return render(request, "cameraapp/stream.html", {
+        return render(request, "cameraapp/video_view.html", {
             "camera_error": camera_error,
             "title": "Live Stream",
             "viewer_count": app_globals.active_stream_viewers,
@@ -192,7 +192,7 @@ def stream_page(request):
         print("[STREAM_PAGE] Timeout: Kein Frame empfangen.")
         camera_error = "Kein Bildsignal von Kamera erhalten."
 
-    return render(request, "cameraapp/stream.html", {
+    return render(request, "cameraapp/video_view.html", {
         "camera_error": camera_error,
         "title": "Live Stream",
         "viewer_count": app_globals.active_stream_viewers,
@@ -342,7 +342,7 @@ def is_recording(request):
 
 
 @login_required
-def photo_gallery(request):
+def photo_view(request):
     photo_dir = os.path.join(settings.MEDIA_ROOT, "photos")
     manual_photos = []
 
@@ -359,14 +359,14 @@ def photo_gallery(request):
 
     settings_obj = get_camera_settings_safe()
 
-    return render(request, "cameraapp/gallery.html", {
+    return render(request, "cameraapp/photo_view.html", {
         "photos": manual_photos,
         "interval": settings_obj.interval_ms if settings_obj else 3000,
         "duration": settings_obj.duration_sec if settings_obj else 30,
         "autoplay": settings_obj.auto_play if settings_obj else False,
         "overlay": settings_obj.overlay_timestamp if settings_obj else True,
         "settings": settings_obj,
-        "title": "Manual Photo Gallery"
+        "title": "Photos"
     })
 
 @login_required
@@ -381,14 +381,14 @@ def timelaps_view(request):
 
     settings_obj = get_camera_settings_safe()
     
-    return render(request, "cameraapp/gallery.html", {
+    return render(request, "cameraapp/timelaps_view.html", {
         "photos": photos,
         "interval": settings_obj.interval_ms if settings_obj else 3000,
         "duration": settings_obj.duration_sec if settings_obj else 30,
         "autoplay": settings_obj.auto_play if settings_obj else False,
         "overlay": settings_obj.overlay_timestamp if settings_obj else True,
         "settings": settings_obj,
-        "title": "Timelapse Gallery"
+        "title": "Timelapse"
     })
 
 @login_required
@@ -592,7 +592,7 @@ def update_photo_settings(request):
         settings_obj = get_camera_settings_safe(connection)
         if not settings_obj:
             print("[UPDATE_PHOTO_SETTINGS] No CameraSettings object found.")
-            return HttpResponseRedirect(reverse("gallery"))
+            return HttpResponseRedirect(reverse("foto_view"))
 
         for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
             value = request.POST.get(f"photo_{param}")
@@ -613,7 +613,7 @@ def update_photo_settings(request):
     except Exception as e:
         print(f"[UPDATE_PHOTO_SETTINGS] Error while saving photo settings: {e}")
 
-    return HttpResponseRedirect(reverse("gallery"))
+    return HttpResponseRedirect(reverse("foto_view"))
 
 
 

@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+{% block content %}
+<meta name="csrf-token" content="{{ csrf_token }}">
+
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: black;
+  }
+  body {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  main{
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+  }
+  #galleryContainer {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: black;
+  }
+
+  #photoCanvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: black;
+    display: block;
+  }
+
+  .overlay-controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1em;
+    border-radius: 8px;
+    color: white;
+  }
+
+  .overlay-controls button {
+    margin: 0.3em;
+    padding: 0.4em 0.8em;
+    background: #1e90ff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .overlay-controls button:hover {
+    background: #3aa0ff;
+  }
+
+  .settings-popup {
+    position: absolute;
+    top: 160px;
+    left: 10px;
+    background: rgba(20, 20, 20, 0.95);
+    padding: 1em;
+    border-radius: 8px;
+    color: white;
+    display: none;
+    z-index: 20;
+    width: 250px;
+  }
+
+  .settings-popup input[type=range] {
+    width: 100%;
+  }
+
+  .settings-popup select,
+  .settings-popup button {
+    margin-top: 0.5em;
+  }
+
+  #thumbnailBar {
+    position: absolute;
+    bottom: 10px;
+    left: 50px;
+    right: 50px;
+    z-index: 15;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px;
+    border-radius: 6px;
+    scrollbar-width: none;
+  }
+
+  #thumbnailBar::-webkit-scrollbar {
+    display: none;
+  }
+
+  #thumbnailBar img {
+    scroll-snap-align: start;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+
+  #thumbnailBar img:hover {
+    transform: scale(1.05);
+  }
+
+  #thumbnailBar img.selected {
+    outline: 3px solid yellow;
+  }
+
+  .thumb-nav-btn {
+    position: absolute;
+    bottom: 16px;
+    z-index: 16;
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    color: white;
+    font-size: 1.5em;
+    padding: 0.3em 0.6em;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+  }
+
+  .thumb-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .thumb-nav-btn.left {
+    left: 10px;
+  }
+
+  .thumb-nav-btn.right {
+    right: 10px;
+  }
+</style>
+
+<div id="galleryContainer">
+  <canvas id="photoCanvas" width="640" height="480"></canvas>
+
+  <div class="overlay-controls">
+    <button onclick="firstImage()">⏮ First</button>
+    <button onclick="prevImage()">⏪ Prev</button>
+    <button onclick="togglePlayPause()" id="playPauseBtn">▶️ Play</button>
+    <button onclick="nextImage()">⏩ Next</button>
+    <button onclick="lastImage()">⏭ Last</button>
+    <button onclick="autoAdjust()">🌞 Auto Adjust</button>
+    <button onclick="takePhoto()">📷 Take Photo</button>
+    <button onclick="toggleSettings()">⚙️ Settings</button>
+    <form method="post" action="{% url 'reset_camera' %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit">🔄 Reset</button>
+    </form>
+  </div>
+
+  <div class="settings-popup" id="settingsPopup">
+    <form method="post" action="{% url 'update_photo_settings' %}">
+      {% csrf_token %}
+      <label>Brightness:</label>
+      <input type="range" step="0.1" name="photo_brightness" min="0" max="255" value="{{ settings.photo_brightness }}"><br>
+
+      <label>Contrast:</label>
+      <input type="range" step="0.1" name="photo_contrast" min="0" max="255" value="{{ settings.photo_contrast }}"><br>
+
+      <label>Saturation:</label>
+      <input type="range" step="0.1" name="photo_saturation" min="0" max="255" value="{{ settings.photo_saturation }}"><br>
+
+      <label>Exposure (-13 to 0):</label>
+      <input type="range" step="0.1" name="photo_exposure" min="-13" max="0" value="{{ settings.photo_exposure }}"><br>
+
+      <label>Gain (0–10):</label>
+      <input type="range" step="0.1" name="photo_gain" min="0" max="10" value="{{ settings.photo_gain }}"><br>
+
+      <label>Exposure Mode:</label>
+      <select name="photo_exposure_mode">
+        <option value="manual" {% if settings.photo_exposure_mode == 'manual' %}selected{% endif %}>Manual</option>
+        <option value="auto" {% if settings.photo_exposure_mode == 'auto' %}selected{% endif %}>Auto</option>
+      </select><br>
+
+      <label>Play Speed (ms):</label>
+      <input type="range" id="speedRange" min="100" max="3000" step="100" value="1000" oninput="updateSpeed(this.value)">
+      <span id="speedLabel">1000</span><br>
+
+      <label>Max Play Duration (sec):</label>
+      <input type="range" id="durationRange" min="5" max="300" step="5" value="30" oninput="updateDuration(this.value)">
+      <span id="durationLabel">30</span><br>
+
+      <button type="submit">✅ Apply</button>
+    </form>
+  </div>
+
+  <div id="thumbnailBar">
+    {% for photo in photos %}
+      <img src="{{ photo }}" width="80" onclick="jumpToIndex({{ forloop.counter0 }})">
+    {% endfor %}
+  </div>
+
+  <button id="thumbPrevBtn" class="thumb-nav-btn left">⏪</button>
+  <button id="thumbNextBtn" class="thumb-nav-btn right">⏩</button>
+</div>
+
+<script>
+  const photos = {{ photos|safe }};
+  let index = 0;
+  let playing = false;
+  let intervalId = null;
+  let stopTimeoutId = null;
+  let intervalMs = 1000;
+  let durationSec = 30;
+
+  const canvas = document.getElementById("photoCanvas");
+  const ctx = canvas.getContext("2d");
+
+
+  function firstImage() {
+    showImage(0);
+  }
+
+  function lastImage() {
+    showImage(photos.length - 1);
+  }
+
+  function toggleSettings() {
+    const popup = document.getElementById("settingsPopup");
+    popup.style.display = popup.style.display === "block" ? "none" : "block";
+  }
+
+  function updateSpeed(val) {
+    intervalMs = parseInt(val);
+    document.getElementById("speedLabel").textContent = val;
+    if (playing) {
+      clearInterval(intervalId);
+      intervalId = setInterval(nextImage, intervalMs);
+    }
+  }
+
+  function updateDuration(val) {
+    durationSec = parseInt(val);
+    document.getElementById("durationLabel").textContent = val;
+  }
+
+  function autoAdjust() {
+    fetch("{% url 'auto_photo_adjust' %}", {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    }).then(r => r.json()).then(data => {
+      alert(data.status);
+      location.reload();
+    });
+  }
+
+  function takePhoto() {
+    fetch("{% url 'take_photo_now' %}", {
+      method: "POST",
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    }).then(res => res.json()).then(data => {
+      alert(data.status || "Photo taken");
+      window.location.href = "/foto_view/"; 
+    });
+  }
+
+
+  function loadImage(src) {
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const match = src.match(/photo_(\d{8}_\d{6})/);
+      if (match) {
+        const raw = match[1];
+        const date = new Date(
+          `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}T${raw.slice(9, 11)}:${raw.slice(11, 13)}:${raw.slice(13, 15)}`
+        );
+        const timestamp = `⏱ ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+        ctx.font = "18px monospace";
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0, 0, canvas.width, 30);
+        ctx.fillStyle = "white";
+        ctx.fillText(timestamp, 10, 22);
+      }
+    };
+    img.src = src;
+  }
+
+  function showImage(i) {
+    if (!photos.length) return;
+    index = (i + photos.length) % photos.length;
+    loadImage(photos[index]);
+
+    const thumbnails = document.querySelectorAll("#thumbnailBar img");
+    thumbnails.forEach((img, i) => {
+      img.classList.toggle("selected", i === index);
+    });
+
+
+    const selectedThumbnail = thumbnails[index];
+    if (selectedThumbnail) {
+      const thumbBar = document.getElementById("thumbnailBar");
+
+      // Position der Thumbnail relativ zur Thumbnail-Leiste (nicht Viewport!)
+      const offsetLeft = selectedThumbnail.offsetLeft;
+      const thumbnailWidth = selectedThumbnail.offsetWidth;
+      const barWidth = thumbBar.offsetWidth;
+
+      const scrollTo = offsetLeft - (barWidth / 2) + (thumbnailWidth / 2);
+      thumbBar.scrollTo({ left: scrollTo, behavior: "smooth" });
+    }
+
+  }
+
+
+  function nextImage() {
+    showImage(index + 1);
+  }
+
+  function prevImage() {
+    showImage(index - 1);
+  }
+
+  function togglePlayPause() {
+    playing = !playing;
+    document.getElementById("playPauseBtn").textContent = playing ? "⏸ Pause" : "▶️ Play";
+    if (playing) {
+      intervalId = setInterval(nextImage, intervalMs);
+      stopTimeoutId = setTimeout(togglePlayPause, durationSec * 1000);
+    } else {
+      clearInterval(intervalId);
+      clearTimeout(stopTimeoutId);
+    }
+  }
+
+  function jumpToIndex(i) {
+    showImage(i);
+  }
+
+  if (photos.length > 0) {
+    showImage(photos.length - 1);
+  }
+
+  // Thumbnail bar scrolling
+  const thumbBar = document.getElementById("thumbnailBar");
+  const scrollAmount = 100;
+  let scrollTimer = null;
+
+  function scrollThumbnails(direction) {
+    thumbBar.scrollBy({ left: direction * scrollAmount, behavior: "smooth" });
+  }
+
+  function startContinuousScroll(direction) {
+    scrollTimer = setInterval(() => scrollThumbnails(direction), 100);
+  }
+
+  function stopContinuousScroll() {
+    clearInterval(scrollTimer);
+  }
+
+  document.getElementById("thumbPrevBtn").addEventListener("mousedown", () => startContinuousScroll(-1));
+  document.getElementById("thumbNextBtn").addEventListener("mousedown", () => startContinuousScroll(1));
+  document.getElementById("thumbPrevBtn").addEventListener("mouseup", stopContinuousScroll);
+  document.getElementById("thumbNextBtn").addEventListener("mouseup", stopContinuousScroll);
+  document.getElementById("thumbPrevBtn").addEventListener("mouseleave", stopContinuousScroll);
+  document.getElementById("thumbNextBtn").addEventListener("mouseleave", stopContinuousScroll);
+  document.getElementById("thumbPrevBtn").addEventListener("click", () => scrollThumbnails(-1));
+  document.getElementById("thumbNextBtn").addEventListener("click", () => scrollThumbnails(1));
+</script>
+{% endblock %}
