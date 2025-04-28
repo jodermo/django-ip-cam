@@ -446,8 +446,10 @@ def media_browser(request):
 
     media_tree = [
         {"label": "Recordings", "path": "/media/recordings", "content": collect_files("/media/recordings", RECORD_DIR)},
-        {"label": "Photos", "path": "/media/photos", "content": collect_files("/media/photos", PHOTO_DIR)}
+        {"label": "Photos", "path": "/media/photos", "content": collect_files("/media/photos", PHOTO_DIR)},
+        {"label": "Timelapse", "path": "/media/photos/timelapse", "content": collect_files("/media/photos/timelapse", os.path.join(PHOTO_DIR, "timelapse"))}
     ]
+
     return render(request, "cameraapp/media_browser.html", {
         "media_tree": media_tree,
         "layout_mode": layout_mode,

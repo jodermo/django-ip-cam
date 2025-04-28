@@ -1,48 +1,44 @@
-<li class="media-row {% if item.type == 'dir' %}folder-row{% else %}file-row{% endif %}" data-name="{{ item.name }}" data-type="{{ item.type }}" data-url="{{ item.url }}">
-  <div class="icon">
-    {% if item.type == "dir" %}📁{% elif item.type == "image" %}🖼️{% elif item.type == "video" %}🎞️{% endif %}
+{% if layout == "thumb" %}
+  <div class="thumb-item" onclick="showMediaModal('{{ item.type }}', '{{ item.url }}')">
+    <div class="thumb-icon">
+      {% if item.type == "image" %}
+        <img src="{{ item.url }}" alt="{{ item.name }}">
+      {% elif item.type == "video" %}
+        <video><source src="{{ item.url }}" type="video/mp4"></video>
+      {% endif %}
+    </div>
+    <div class="thumb-name">{{ item.name }}</div>
+    {% if item.mtime %}<div class="thumb-date">{{ item.mtime|date:"Y-m-d H:i" }}</div>{% endif %}
+    {% if "timelapse" in item.path %}<div style="color:orange;">⏱️</div>{% endif %}
   </div>
-  <div class="name">
+{% else %}
+  <li class="media-row {% if item.type == 'dir' %}folder-row{% else %}file-row{% endif %}" data-name="{{ item.name }}" data-type="{{ item.type }}" data-url="{{ item.url }}">
+    <div class="icon">
+      {% if item.type == "dir" %}📁{% elif item.type == "image" %}🖼️{% elif item.type == "video" %}🎞️{% endif %}
+    </div>
+    <div class="name">
+      {% if item.type == "dir" %}<strong>{{ item.name }}/</strong>{% else %}{{ item.name }}{% endif %}
+      {% if "timelapse" in item.path %}<span style="color:orange;">[⏱️]</span>{% endif %}
+    </div>
+    <div class="date">{% if item.mtime %}{{ item.mtime|date:"Y-m-d H:i:s" }}{% endif %}</div>
+    <div class="size">{% if item.size %}{{ item.size|filesizeformat }}{% endif %}</div>
+    <div class="actions">
+      {% if item.type != "dir" %}
+        <form method="post" action="{% url 'delete_media_file' %}" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="file_path" value="{{ section.label|lower }}/{{ item.name }}">
+          <button title="Delete" onclick="return confirm('Delete {{ item.name }}?')">🗑️</button>
+        </form>
+      {% endif %}
+    </div>
     {% if item.type == "dir" %}
-      <strong>{{ item.name }}/</strong>
+      <ul>
+        {% for child in item.children %}
+          {% include "cameraapp/media_item.html" with item=child section=section layout=layout %}
+        {% endfor %}
+      </ul>
     {% else %}
-      {{ item.name }}
+      {% if item.type == "image" %}<img src="{{ item.url }}" style="display:none;" />{% elif item.type == "video" %}<video style="display:none;"><source src="{{ item.url }}" type="video/mp4" /></video>{% endif %}
     {% endif %}
-    {% if "timelapse" in item.path %}
-      <span style="color:orange;">[⏱️]</span>
-    {% endif %}
-  </div>
-  <div class="date">
-    {% if item.mtime %}
-      {{ item.mtime|date:"Y-m-d H:i:s" }}
-    {% endif %}
-  </div>
-  <div class="size">
-    {% if item.size %}
-      {{ item.size|filesizeformat }}
-    {% endif %}
-  </div>
-  <div class="actions">
-    {% if item.type != "dir" %}
-      <form method="post" action="{% url 'delete_media_file' %}" style="display:inline;">
-        {% csrf_token %}
-        <input type="hidden" name="file_path" value="{{ section.label|lower }}/{{ item.name }}">
-        <button title="Delete" onclick="return confirm('Delete {{ item.name }}?')">🗑️</button>
-      </form>
-    {% endif %}
-  </div>
-
-  {% if item.type == "dir" %}
-    <ul>
-      {% for child in item.children %}
-        {% include "cameraapp/media_item.html" with item=child section=section %}
-      {% endfor %}
-    </ul>
-  {% else %}
-    {% if item.type == "image" %}
-      <img src="{{ item.url }}" style="display:none;" />
-    {% elif item.type == "video" %}
-      <video style="display:none;"><source src="{{ item.url }}" type="video/mp4" /></video>
-    {% endif %}
-  {% endif %}
-</li>
+  </li>
+{% endif %}

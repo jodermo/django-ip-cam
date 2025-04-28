@@ -21,7 +21,13 @@
 
 <!-- Media Sections -->
 {% for section in media_tree %}
-  <h2>{{ section.label }}</h2>
+  {% if section.label == "Photos" %}
+    <h2>Photos (Manual)</h2>
+  {% elif section.label == "Timelapse" %}
+    <h2>Photos (Timelapse)</h2>
+  {% else %}
+    <h2>{{ section.label }}</h2>
+  {% endif %}
 
   {% if layout_mode == "thumb" %}
     <div class="thumb-grid">
