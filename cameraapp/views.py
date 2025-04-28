@@ -548,7 +548,7 @@ def update_photo_settings(request):
         settings_obj = get_camera_settings_safe(connection)
         if not settings_obj:
             print("[UPDATE_PHOTO_SETTINGS] No CameraSettings object found.")
-            return HttpResponseRedirect(reverse("photo_settings_page"))
+            return HttpResponseRedirect(reverse("gallery"))
 
         for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
             value = request.POST.get(f"photo_{param}")
@@ -569,7 +569,7 @@ def update_photo_settings(request):
     except Exception as e:
         print(f"[UPDATE_PHOTO_SETTINGS] Error while saving photo settings: {e}")
 
-    return HttpResponseRedirect(reverse("photo_settings_page"))
+    return HttpResponseRedirect(reverse("gallery"))
 
 
 
@@ -620,7 +620,7 @@ def resume_livestream():
         print("[PHOTO] Forcing camera reset and re-init...")
         release_and_reset_camera()
         init_camera()
-        
+
         # Livestream starten
         app_globals.livestream_job = safe_restart_camera_stream(
             frame_callback=update_latest_frame,

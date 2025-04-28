@@ -298,10 +298,25 @@
     if (!photos.length) return;
     index = (i + photos.length) % photos.length;
     loadImage(photos[index]);
-    document.querySelectorAll("#thumbnailBar img").forEach((img, i) => {
+
+    const thumbnails = document.querySelectorAll("#thumbnailBar img");
+    thumbnails.forEach((img, i) => {
       img.classList.toggle("selected", i === index);
     });
+
+
+    const selectedThumbnail = thumbnails[index];
+    if (selectedThumbnail) {
+      const thumbBar = document.getElementById("thumbnailBar");
+      const thumbBarRect = thumbBar.getBoundingClientRect();
+      const selectedRect = selectedThumbnail.getBoundingClientRect();
+      const scrollLeft = thumbBar.scrollLeft;
+
+      const centerOffset = selectedRect.left - thumbBarRect.left - (thumbBarRect.width / 2) + (selectedRect.width / 2);
+      thumbBar.scrollTo({ left: scrollLeft + centerOffset, behavior: "smooth" });
+    }
   }
+
 
   function nextImage() {
     showImage(index + 1);
@@ -328,7 +343,7 @@
   }
 
   if (photos.length > 0) {
-    showImage(0);
+    showImage(photos.length - 1);
   }
 
   // Thumbnail bar scrolling
