@@ -1,35 +1,45 @@
-<li>
-
+<li class="media-row {% if item.type == 'dir' %}folder-row{% else %}file-row{% endif %}">
+  <div class="icon">
+    {% if item.type == "dir" %}📁{% elif item.type == "image" %}🖼️{% elif item.type == "video" %}🎞️{% endif %}
+  </div>
+  <div class="name">
     {% if item.type == "dir" %}
-      <div class="folder-label"><strong>{{ item.name }}/</strong></div>
-      <ul>
-        {% for child in item.children %}
-          {% include "cameraapp/media_item.html" with item=child %}
-        {% endfor %}
-      </ul>
+      <strong>{{ item.name }}/</strong>
+    {% else %}
+      {{ item.name }}
     {% endif %}
-
-    {% if item.type == "image" or item.type == "video" %}
-      <div class="file-entry">
-        <p>{{ item.name }} <small>({{ item.mtime|date:"Y-m-d H:i:s" }})</small></p>
-
-        {% if item.type == "image" %}
-          <img src="{{ item.url }}" width="320" style="margin-bottom: 10px;" />
-        {% elif item.type == "video" %}
-          <video width="320" controls style="margin-bottom: 10px;">
-            <source src="{{ item.url }}" type="video/mp4">
-            Your browser does not support the video tag.
-          </video>
-        {% endif %}
-
-        <form method="post" action="{% url 'delete_media_file' %}" style="display:inline;">
-          {% csrf_token %}
-          <input type="hidden" name="file_path" value="{{ section.label|lower }}/{{ item.name }}">
-          <button type="submit" onclick="return confirm('Delete {{ item.name }}?')">🗑️ Delete</button>
-        </form>
-      </div>
+  </div>
+  <div class="date">
+    {% if item.mtime %}
+      {{ item.mtime|date:"Y-m-d H:i:s" }}
     {% endif %}
+  </div>
+  <div class="size">
+    {% if item.size %}
+      {{ item.size|filesizeformat }}
+    {% endif %}
+  </div>
+  <div class="actions">
+    {% if item.type != "dir" %}
+      <form method="post" action="{% url 'delete_media_file' %}" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="file_path" value="{{ section.label|lower }}/{{ item.name }}">
+        <button title="Delete" onclick="return confirm('Delete {{ item.name }}?')">🗑️</button>
+      </form>
+    {% endif %}
+  </div>
 
-
-  </li>
-  
+  {% if item.type == "dir" %}
+    <ul>
+      {% for child in item.children %}
+        {% include "cameraapp/media_item.html" with item=child section=section %}
+      {% endfor %}
+    </ul>
+  {% else %}
+    {% if item.type == "image" %}
+      <img src="{{ item.url }}" style="display:none;" />
+    {% elif item.type == "video" %}
+      <video style="display:none;"><source src="{{ item.url }}" type="video/mp4" /></video>
+    {% endif %}
+  {% endif %}
+</li>
