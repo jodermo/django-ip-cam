@@ -17,6 +17,7 @@ PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
 def take_photo(mode="manual"):
+
     """
     Captures a photo from the camera.
     Temporarily stops the livestream if running, captures a frame, then resumes if needed.
@@ -36,6 +37,7 @@ def take_photo(mode="manual"):
         app_globals.livestream_job 
         and app_globals.livestream_job.running
     )
+    app_globals.livestream_job.pause()
     if livestream_was_running:
         try:
             logger.info("[PHOTO] Pausing livestream for photo capture...")
@@ -96,6 +98,7 @@ def take_photo(mode="manual"):
     # Restart livestream if it was running before
     if livestream_was_running:
         try:
+            app_globals.livestream_job.resume()
             logger.info("[PHOTO] Restarting livestream after photo...")
             force_restart_livestream()
         except Exception as e:

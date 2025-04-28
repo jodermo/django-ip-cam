@@ -679,6 +679,11 @@ def resume_livestream():
     finally:
         app_globals.livestream_resume_lock.release()
 
+    if not app_globals.camera or not app_globals.camera.cap.isOpened():
+        print("Camera is not open after resume attempt. Forcing full reset.")
+        release_and_reset_camera() 
+        wait_until_camera_available(timeout=5)
+
 
 
 @csrf_exempt

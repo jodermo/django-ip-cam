@@ -193,6 +193,7 @@ def force_restart_livestream():
 def release_and_reset_camera():
     global app_globals
     try:
+        app_globals.camera.release() 
         if app_globals.livestream_job and app_globals.livestream_job.capture:
             app_globals.livestream_job.capture.release()
             app_globals.livestream_job.capture = None
