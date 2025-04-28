@@ -18,7 +18,7 @@ class CameraAppConfig(AppConfig):
             from .camera_core import init_camera
             from .camera_utils import start_camera_watchdog
             print("[CAMERA_APP] Initializing camera...")
-            init_camera()
+            init_camera(skip_stream=True)
             print("[CAMERA_APP] Camera init done.")
         except Exception as e:
             print(f"[CAMERA_APP] Error during initial camera init: {e}")

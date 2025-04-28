@@ -49,7 +49,7 @@ def take_photo():
         if not app_globals.camera or not app_globals.camera.cap or not app_globals.camera.cap.isOpened():
             logger.warning("[PHOTO] CameraManager not ready or cap not opened. Attempting reinitialization.")
             try:
-                init_camera()
+                init_camera(skip_stream=True)
             except Exception as e:
                 logger.error(f"[PHOTO] init_camera() failed: {e}")
                 return None
@@ -121,7 +121,7 @@ def start_photo_scheduler():
     # Einmalige Initialisierung vor Start
     try:
         logger.info("[SCHEDULER] Initializing camera before timelapse loop.")
-        init_camera()
+        init_camera(skip_stream=True)
         time.sleep(2.0)  # kurze Pause zur Stabilisierung
         if not app_globals.camera or not app_globals.camera.is_available():
             logger.warning("[SCHEDULER] Camera not ready after init → force restart")
@@ -142,7 +142,7 @@ def start_photo_scheduler():
                 if result is None:
                     logger.warning("[SCHEDULER] take_photo failed, trying to reinit camera")
                     try:
-                        init_camera()
+                        init_camera(skip_stream=True)
                         time.sleep(1.0)
                         result = take_photo()
                     except Exception as e:

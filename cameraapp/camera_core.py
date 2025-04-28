@@ -40,8 +40,7 @@ if CAMERA_URL_RAW == "0" and not os.path.exists("/dev/video0"):
 else:
     CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
-
-def init_camera():
+def init_camera(skip_stream=False):
     if app_globals.camera and app_globals.camera.is_available():
         print("[CAMERA_CORE] Camera already initialized")
         return
@@ -64,16 +63,17 @@ def init_camera():
             app_globals.camera = new_camera
             print("[CAMERA_CORE] CameraManager initialized and running.")
 
-            if not app_globals.livestream_job or not app_globals.livestream_job.running:
-                job = safe_restart_camera_stream(
+            if not skip_stream and (not app_globals.livestream_job or not app_globals.livestream_job.running):
+                print("[CAMERA_CORE] Starting livestream job...")
+                from .livestream_job import LiveStreamJob  # Import lokal halten
+                job = LiveStreamJob(
                     camera_source=CAMERA_URL,
-                    frame_callback=lambda f: update_latest_frame(f)
+                    frame_callback=lambda f: update_latest_frame(f),
+                    shared_capture=new_camera.cap
                 )
-                if job:
-                    app_globals.livestream_job = job
-                    update_livestream_job(job)
-                else:
-                    print("[CAMERA_CORE] Failed to start livestream job.")
+                job.start()
+                app_globals.livestream_job = job
+                update_livestream_job(job)
 
             print(f"[DEBUG] camera is {app_globals.camera}")
             print(f"[DEBUG] livestream_job is {app_globals.livestream_job}")
