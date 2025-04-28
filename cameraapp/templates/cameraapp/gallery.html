@@ -308,13 +308,16 @@
     const selectedThumbnail = thumbnails[index];
     if (selectedThumbnail) {
       const thumbBar = document.getElementById("thumbnailBar");
-      const thumbBarRect = thumbBar.getBoundingClientRect();
-      const selectedRect = selectedThumbnail.getBoundingClientRect();
-      const scrollLeft = thumbBar.scrollLeft;
 
-      const centerOffset = selectedRect.left - thumbBarRect.left - (thumbBarRect.width / 2) + (selectedRect.width / 2);
-      thumbBar.scrollTo({ left: scrollLeft + centerOffset, behavior: "smooth" });
+      // Position der Thumbnail relativ zur Thumbnail-Leiste (nicht Viewport!)
+      const offsetLeft = selectedThumbnail.offsetLeft;
+      const thumbnailWidth = selectedThumbnail.offsetWidth;
+      const barWidth = thumbBar.offsetWidth;
+
+      const scrollTo = offsetLeft - (barWidth / 2) + (thumbnailWidth / 2);
+      thumbBar.scrollTo({ left: scrollTo, behavior: "smooth" });
     }
+
   }
 
 
