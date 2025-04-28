@@ -52,7 +52,7 @@ def take_photo(mode="manual"):
             except Exception as e:
                 logger.warning(f"[PHOTO] Failed to apply photo settings: {e}")
 
-        # Try to use latest buffered frame first
+        # Try to use the latest buffered frame first
         frame = None
         with app_globals.latest_frame_lock:
             if app_globals.latest_frame is not None:
@@ -61,16 +61,16 @@ def take_photo(mode="manual"):
         # If no buffered frame available, read from cap
         if frame is None:
             logger.info("[PHOTO] No buffered frame available. Reading directly from camera...")
-            for attempt in range(3):
+            for attempt in range(5):  # Increase the retry count for better reliability
                 ret, temp = cap.read()
                 if ret and temp is not None:
                     frame = temp
                     break
-                logger.warning(f"[PHOTO] Camera read failed (attempt {attempt+1})")
+                logger.warning(f"[PHOTO] Camera read failed (attempt {attempt + 1})")
                 time.sleep(0.5)
 
             if frame is None:
-                logger.error("[PHOTO] Failed to capture a valid frame.")
+                logger.error("[PHOTO] Failed to capture a valid frame after multiple retries.")
                 return None
 
     # Save image
@@ -80,6 +80,7 @@ def take_photo(mode="manual"):
 
     logger.info(f"[PHOTO] Photo saved: {filepath}")
     return filepath
+
 
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
@@ -95,7 +96,6 @@ def wait_for_table(table_name, db_alias="default", timeout=30):
         except Exception:
             time.sleep(1)
     logger.error(f"[ERROR] Timeout: Table '{table_name}' not found after {timeout} seconds.")
-
 
 def start_photo_scheduler():
     """
@@ -120,6 +120,7 @@ def start_photo_scheduler():
             time.sleep(2.0)
     except Exception as e:
         logger.error(f"[SCHEDULER] Initial camera setup failed: {e}")
+        return  # If the setup fails, exit early
 
     # Main loop
     while True:
@@ -153,8 +154,3 @@ def start_photo_scheduler():
 
         logger.debug(f"[SCHEDULER] Sleeping for {interval_min} minutes...")
         time.sleep(interval_min * 60)
-
-
-
-
-
