@@ -8,6 +8,9 @@
     {% else %}
       {{ item.name }}
     {% endif %}
+    {% if "timelapse" in item.path %}
+      <span style="color:orange;">[⏱️]</span>
+    {% endif %}
   </div>
   <div class="date">
     {% if item.mtime %}

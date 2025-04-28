@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
-def take_photo():
+def take_photo(mode="manual"):
     """
     Captures a photo from the camera.
     Temporarily stops the livestream if running, captures a frame, then resumes if needed.
@@ -24,8 +24,12 @@ def take_photo():
     """
     logger.debug("[PHOTO] take_photo called")
 
+    subfolder = "timelapse" if mode == "timelapse" else "manual"
+    save_dir = os.path.join(PHOTO_DIR, subfolder)
+    os.makedirs(save_dir, exist_ok=True)
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(PHOTO_DIR, f"photo_{timestamp}.jpg")
+    filepath = os.path.join(save_dir, f"photo_{timestamp}.jpg")
 
     # Check if livestream is running and stop it temporarily
     livestream_was_running = (
@@ -151,14 +155,14 @@ def start_photo_scheduler():
 
                 if settings_obj.timelapse_enabled:
                     logger.info(f"[SCHEDULER] Timelapse active → capturing photo @ {datetime.now()}")
-                    result = take_photo()
+                    result = take_photo(mode="timelapse")
 
                     if result is None:
                         logger.warning("[SCHEDULER] Photo capture failed. Retrying after reinit...")
                         try:
                             init_camera(skip_stream=True)
                             time.sleep(1.0)
-                            result = take_photo()
+                            result = take_photo(mode="timelapse")
                         except Exception as e:
                             logger.error(f"[SCHEDULER] Retry failed: {e}")
                 else:

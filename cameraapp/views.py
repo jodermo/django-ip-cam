@@ -343,22 +343,53 @@ def is_recording(request):
 
 @login_required
 def photo_gallery(request):
+    photo_dir = os.path.join(settings.MEDIA_ROOT, "photos")
+    manual_photos = []
+
+    if os.path.exists(photo_dir):
+        for fname in sorted(os.listdir(photo_dir)):
+            full_path = os.path.join(photo_dir, fname)
+
+            # skip 'timelapse/' folder and nested files
+            if os.path.isdir(full_path) and fname == "timelapse":
+                continue
+
+            if os.path.isfile(full_path) and fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                manual_photos.append(f"/media/photos/{fname}")
+
+    settings_obj = get_camera_settings_safe()
+
+    return render(request, "cameraapp/gallery.html", {
+        "photos": manual_photos,
+        "interval": settings_obj.interval_ms if settings_obj else 3000,
+        "duration": settings_obj.duration_sec if settings_obj else 30,
+        "autoplay": settings_obj.auto_play if settings_obj else False,
+        "overlay": settings_obj.overlay_timestamp if settings_obj else True,
+        "settings": settings_obj,
+        "title": "Manual Photo Gallery"
+    })
+
+@login_required
+def timelaps_view(request):
+    timelapse_dir = os.path.join(settings.MEDIA_ROOT, "photos", "timelapse")
     photos = []
-    if os.path.exists(PHOTO_DIR):
-        for fname in sorted(os.listdir(PHOTO_DIR)):
+
+    if os.path.exists(timelapse_dir):
+        for fname in sorted(os.listdir(timelapse_dir)):
             if fname.lower().endswith((".jpg", ".jpeg", ".png")):
-                photos.append(f"/media/photos/{fname}")
-    settings_obj = get_camera_settings_safe(connection) 
+                photos.append(f"/media/photos/timelapse/{fname}")
+
+    settings_obj = get_camera_settings_safe()
+    
     return render(request, "cameraapp/gallery.html", {
         "photos": photos,
         "interval": settings_obj.interval_ms if settings_obj else 3000,
         "duration": settings_obj.duration_sec if settings_obj else 30,
         "autoplay": settings_obj.auto_play if settings_obj else False,
         "overlay": settings_obj.overlay_timestamp if settings_obj else True,
-        "settings": settings_obj,  # <-- hinzugefügt
-        "title": "Gallery"
+        "settings": settings_obj,
+        "title": "Timelapse Gallery"
     })
-
 
 @login_required
 def settings_view(request):
@@ -705,7 +736,7 @@ def take_photo_now(request):
             return JsonResponse({"status": "camera not ready after retries"}, status=500)
 
         # === [2] Foto machen (take_photo hat eigenen Lock) ===
-        photo_path = take_photo()
+        photo_path = take_photo(mode="manual")
 
         if not photo_path:
             print("[PHOTO] take_photo() returned None")
