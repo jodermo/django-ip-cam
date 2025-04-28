@@ -127,7 +127,7 @@ class LiveStreamJob:
                 settings = get_camera_settings()
                 if settings:
                     try:
-                        apply_cv_settings(app_globals.camera.cap, settings, mode="video")
+                        apply_cv_settings(app_globals.camera, settings, mode="video")
                         logger.info("Camera settings applied successfully")
                     except Exception as e:
                         logger.warning(f"Failed to apply camera settings: {e}")
