@@ -592,7 +592,7 @@ def update_photo_settings(request):
         settings_obj = get_camera_settings_safe(connection)
         if not settings_obj:
             print("[UPDATE_PHOTO_SETTINGS] No CameraSettings object found.")
-            return HttpResponseRedirect(reverse("foto_view"))
+            return HttpResponseRedirect(reverse("photo_view"))
 
         for param in ["brightness", "contrast", "saturation", "exposure", "gain"]:
             value = request.POST.get(f"photo_{param}")
@@ -613,7 +613,7 @@ def update_photo_settings(request):
     except Exception as e:
         print(f"[UPDATE_PHOTO_SETTINGS] Error while saving photo settings: {e}")
 
-    return HttpResponseRedirect(reverse("foto_view"))
+    return HttpResponseRedirect(reverse("photo_view"))
 
 
 
