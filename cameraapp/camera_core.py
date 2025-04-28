@@ -15,20 +15,15 @@ load_dotenv()
 
 def find_working_camera_device():
     candidates = sorted(glob.glob("/dev/video*"))
-    print(f"[CAMERA_CORE] Scanning for available video devices: {candidates}")
     for device in candidates:
-        try:
-            cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
-            if cap.isOpened():
-                ret, _ = cap.read()
-                cap.release()
-                if ret:
-                    print(f"[CAMERA_CORE] Found working camera: {device}")
-                    return device
-        except Exception as e:
-            print(f"[CAMERA_CORE] Error testing {device}: {e}")
-    print("[CAMERA_CORE] No working camera found.")
+        cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
+        if cap.isOpened():
+            ret, _ = cap.read()
+            cap.release()
+            if ret:
+                return device
     return None
+
 
 
 CAMERA_URL_RAW = os.getenv("CAMERA_URL", "0")
@@ -40,6 +35,14 @@ if CAMERA_URL_RAW == "0" and not os.path.exists("/dev/video0"):
 else:
     CAMERA_URL = int(CAMERA_URL_RAW) if CAMERA_URL_RAW.isdigit() else CAMERA_URL_RAW
 
+
+def resolve_camera_source():
+    if CAMERA_URL == "0" and not os.path.exists("/dev/video0"):
+        fallback = find_working_camera_device()
+        return fallback if fallback else "/dev/video0"
+    return CAMERA_URL
+
+
 def init_camera(skip_stream=False):
     if app_globals.camera and app_globals.camera.is_available():
         print("[CAMERA_CORE] Camera already initialized")
@@ -48,26 +51,19 @@ def init_camera(skip_stream=False):
     print("[CAMERA_CORE] Initializing new CameraManager...")
 
     try:
-        source = CAMERA_URL
-        if source == "0" and not os.path.exists("/dev/video0"):
-            fallback = find_working_camera_device()
-            source = fallback if fallback else 0
+        source = resolve_camera_source()
 
         new_camera = CameraManager(source=source)
 
-        if new_camera.is_available():
-            if not new_camera.cap or not new_camera.cap.isOpened():
-                print("[CAMERA_CORE] Cap not ready after init.")
-                return
-
+        if new_camera.is_available() and new_camera.cap and new_camera.cap.isOpened():
             app_globals.camera = new_camera
             print("[CAMERA_CORE] CameraManager initialized and running.")
 
             if not skip_stream and (not app_globals.livestream_job or not app_globals.livestream_job.running):
                 print("[CAMERA_CORE] Starting livestream job...")
-                from .livestream_job import LiveStreamJob  # Import lokal halten
+                from .livestream_job import LiveStreamJob
                 job = LiveStreamJob(
-                    camera_source=CAMERA_URL,
+                    camera_source=source,
                     frame_callback=lambda f: update_latest_frame(f),
                     shared_capture=new_camera.cap
                 )
