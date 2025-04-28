@@ -1,6 +1,7 @@
 import os
 import threading
 from django.apps import AppConfig
+from .globals import app_globals
 
 class CameraAppConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
@@ -34,7 +35,12 @@ class CameraAppConfig(AppConfig):
             try:
                 from .scheduler import start_photo_scheduler
                 print("[CAMERA_APP] Starting timelapse scheduler thread...")
-                threading.Thread(target=start_photo_scheduler, daemon=True).start()
+    
+
+                thread = threading.Thread(target=start_photo_scheduler, daemon=True)
+                thread.start()
+                app_globals.photo_scheduler_thread = thread
+
             except Exception as e:
                 print(f"[CAMERA_APP] Failed to start photo scheduler: {e}")
 
