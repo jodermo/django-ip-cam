@@ -21,7 +21,7 @@ class CameraAppConfig(AppConfig):
             print(f"[CAMERA_APP] Fehler beim Start des Watchdogs: {e}")
 
         try:
-            from .scheduler import start_photo_scheduler
+            from .photo_camera import start_photo_scheduler
             import cameraapp.globals as app_globals
 
             thread = threading.Thread(target=start_photo_scheduler, daemon=True)

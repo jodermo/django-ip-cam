@@ -1,4 +1,4 @@
-# cameraapp/sheduler.py
+# cameraapp/photo_camera.py
 
 import os
 import time
@@ -17,10 +17,10 @@ PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
 def take_photo(mode="manual"):
-
     """
-    Captures a photo from the camera.
-    Temporarily stops the livestream if running, captures a frame, then resumes if needed.
+    Captures a photo from the current camera stream.
+    Reuses the shared capture without stopping the livestream.
+    Falls back to cap.read() only if no valid frame is buffered.
     Returns the file path on success, None on failure.
     """
     logger.debug("[PHOTO] take_photo called")
@@ -32,80 +32,54 @@ def take_photo(mode="manual"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = os.path.join(save_dir, f"photo_{timestamp}.jpg")
 
-    # Check if livestream is running and stop it temporarily
-    livestream_was_running = (
-        app_globals.livestream_job 
-        and app_globals.livestream_job.running
-    )
-    app_globals.livestream_job.pause()
-    if livestream_was_running:
-        try:
-            logger.info("[PHOTO] Pausing livestream for photo capture...")
-            app_globals.livestream_job.stop()
-            app_globals.livestream_job.join(timeout=2.0)
-            app_globals.livestream_job = None
-        except Exception as e:
-            logger.warning(f"[PHOTO] Failed to stop livestream: {e}")
-
     with app_globals.camera_lock:
-        if not app_globals.camera or not app_globals.camera.cap or not app_globals.camera.cap.isOpened():
+        cap = app_globals.camera.cap if app_globals.camera else None
+        if not cap or not cap.isOpened():
             logger.warning("[PHOTO] Camera not ready. Attempting reinit.")
             try:
-                init_camera(skip_stream=True)
+                init_camera(skip_stream=False)
                 time.sleep(1.0)
+                cap = app_globals.camera.cap
             except Exception as e:
                 logger.error(f"[PHOTO] Camera reinit failed: {e}")
                 return None
 
-        # Ensure camera is usable
-        for i in range(5):
-            if app_globals.camera and app_globals.camera.cap.isOpened():
-                ret, _ = app_globals.camera.cap.read()
-                if ret:
-                    break
-            logger.info(f"[PHOTO] Waiting for camera to stabilize ({i+1}/5)")
-            time.sleep(1.0)
-        else:
-            logger.error("[PHOTO] Camera did not become ready.")
-            return None
-
-        # Apply settings
+        # Apply photo-specific settings
         settings = get_camera_settings()
         if settings:
             try:
                 apply_cv_settings(app_globals.camera, settings, mode="photo")
             except Exception as e:
-                logger.warning(f"[PHOTO] Failed to apply settings: {e}")
+                logger.warning(f"[PHOTO] Failed to apply photo settings: {e}")
 
-        # Capture the frame
-        frame = app_globals.camera.get_frame()
+        # Try to use latest buffered frame first
+        frame = None
+        with app_globals.latest_frame_lock:
+            if app_globals.latest_frame is not None:
+                frame = app_globals.latest_frame.copy()
+
+        # If no buffered frame available, read from cap
         if frame is None:
-            logger.warning("[PHOTO] Frame is None. Forcing camera reinit...")
-            init_camera(skip_stream=True)
-            time.sleep(1.0)
-            frame = app_globals.camera.get_frame()
+            logger.info("[PHOTO] No buffered frame available. Reading directly from camera...")
+            for attempt in range(3):
+                ret, temp = cap.read()
+                if ret and temp is not None:
+                    frame = temp
+                    break
+                logger.warning(f"[PHOTO] Camera read failed (attempt {attempt+1})")
+                time.sleep(0.5)
+
             if frame is None:
-                logger.error("[PHOTO] Still failed to capture frame.")
+                logger.error("[PHOTO] Failed to capture a valid frame.")
                 return None
 
+    # Save image
+    if not cv2.imwrite(filepath, frame):
+        logger.error("[PHOTO] Failed to write photo.")
+        return None
 
-        if not cv2.imwrite(filepath, frame):
-            logger.error("[PHOTO] Failed to write photo.")
-            return None
-
-        logger.info(f"[PHOTO] Photo saved: {filepath}")
-
-    # Restart livestream if it was running before
-    if livestream_was_running:
-        try:
-            app_globals.livestream_job.resume()
-            logger.info("[PHOTO] Restarting livestream after photo...")
-            force_restart_livestream()
-        except Exception as e:
-            logger.error(f"[PHOTO] Failed to restart livestream: {e}")
-
+    logger.info(f"[PHOTO] Photo saved: {filepath}")
     return filepath
-
 
 
 def wait_for_table(table_name, db_alias="default", timeout=30):
