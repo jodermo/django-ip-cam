@@ -87,6 +87,7 @@ def init_camera(skip_stream=False):
     except Exception as e:
         print(f"[CAMERA_CORE] Exception during camera init: {e}")
 
+        
 def reset_to_default():
     settings = CameraSettings.objects.first()
     if not settings:
@@ -109,6 +110,15 @@ def reset_to_default():
 
     settings.save()
     print("[RESET] CameraSettings auf Default zurückgesetzt.")
+
+    # Reinitialize camera after resetting settings
+    try:
+        from .camera_core import init_camera
+        init_camera(skip_stream=False)  # Ensure the stream is restarted
+        print("[RESET] Camera reinitialized after settings reset.")
+    except Exception as e:
+        print(f"[RESET] Error during camera reinitialization: {e}")
+
 
 
 def apply_auto_settings(settings, mode="photo"):

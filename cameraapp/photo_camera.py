@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 PHOTO_DIR = os.path.join(settings.MEDIA_ROOT, "photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
-
 def take_photo(mode="manual"):
     """
     Captures a photo from the current camera stream.
@@ -32,6 +31,7 @@ def take_photo(mode="manual"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = os.path.join(save_dir, f"photo_{timestamp}.jpg")
 
+    # Ensure camera is initialized before taking a photo
     with app_globals.camera_lock:
         cap = app_globals.camera.cap if app_globals.camera else None
         if not cap or not cap.isOpened():
@@ -61,7 +61,7 @@ def take_photo(mode="manual"):
         # If no buffered frame available, read from cap
         if frame is None:
             logger.info("[PHOTO] No buffered frame available. Reading directly from camera...")
-            for attempt in range(5):  # Increase the retry count for better reliability
+            for attempt in range(5):  # Increased retry attempts for stability
                 ret, temp = cap.read()
                 if ret and temp is not None:
                     frame = temp

@@ -36,7 +36,8 @@ from .camera_core import (
 )
 from .camera_utils import safe_restart_camera_stream, update_latest_frame
 from .globals import app_globals
-from .scheduler import take_photo 
+
+from .photo_camera import take_photo 
 
 
 from dotenv import load_dotenv
