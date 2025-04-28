@@ -51,8 +51,13 @@ services:
         python manage.py migrate &&
         echo '[MIGRATE] Done, starting scheduler...'
       "
-    env_file:
-      - .env
+    environment:
+      DJANGO_SECRET_KEY: change-me-to-a-secure-random-string
+      DEBUG: "False"
+      CAMERA_URL: "0"
+      ALLOWED_HOSTS: "127.0.0.1,localhost"
+      RUN_TIMELAPSE: "0"
+      RUN_MAIN: "false"
     volumes:
       - .:/app
 

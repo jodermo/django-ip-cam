@@ -521,7 +521,7 @@ def update_camera_settings(request):
 
             release_and_reset_camera()
             print("[RELEASE] Camera released.")
-
+            init_camera() 
             print("[DEBUG] Calling safe_restart_camera_stream...")
             app_globals.livestream_job = safe_restart_camera_stream(
                 frame_callback=lambda f: update_latest_frame(f),
@@ -607,16 +607,20 @@ def resume_livestream():
                 return
 
         # === Warten, bis cap wirklich offen ist ===
-        for attempt in range(6):
+
+        for attempt in range(15):  # statt 6 Versuche
             if app_globals.camera and app_globals.camera.cap and app_globals.camera.cap.isOpened():
-                print(f"[PHOTO] Camera ready for livestream on attempt {attempt + 1}")
                 break
-            print(f"[PHOTO] Waiting for camera reopen... attempt {attempt + 1}/6")
+            print(f"[PHOTO] Waiting for camera reopen... attempt {attempt + 1}/15")
             time.sleep(1.0)
         else:
             print("[PHOTO] Camera still not available. Aborting resume.")
             return
 
+        print("[PHOTO] Forcing camera reset and re-init...")
+        release_and_reset_camera()
+        init_camera()
+        
         # Livestream starten
         app_globals.livestream_job = safe_restart_camera_stream(
             frame_callback=update_latest_frame,

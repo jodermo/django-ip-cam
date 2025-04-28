@@ -110,24 +110,49 @@ def wait_for_table(table_name, db_alias="default", timeout=30):
             time.sleep(1)
     logger.error(f"[ERROR] Timeout: Table '{table_name}' not found after {timeout} seconds.")
 
-
 def start_photo_scheduler():
     """
     Starts the periodic photo capture loop based on configured intervals.
+    Ensures camera is initialized and usable before each capture.
     """
     logger.info("[SCHEDULER] Starting photo scheduler...")
     wait_for_table("cameraapp_camerasettings")
+
+    # Einmalige Initialisierung vor Start
+    try:
+        logger.info("[SCHEDULER] Initializing camera before timelapse loop.")
+        init_camera()
+        time.sleep(2.0)  # kurze Pause zur Stabilisierung
+        if not app_globals.camera or not app_globals.camera.is_available():
+            logger.warning("[SCHEDULER] Camera not ready after init → force restart")
+            from .camera_utils import force_restart_livestream
+            force_restart_livestream()
+            time.sleep(2.0)
+    except Exception as e:
+        logger.error(f"[SCHEDULER] Initial camera init failed: {e}")
 
     while True:
         try:
             settings_obj = get_camera_settings()
             if settings_obj and settings_obj.timelapse_enabled:
                 logger.info(f"[SCHEDULER] Timelapse active. Taking photo at {datetime.now()}")
-                take_photo()
+
+                result = take_photo()
+
+                if result is None:
+                    logger.warning("[SCHEDULER] take_photo failed, trying to reinit camera")
+                    try:
+                        init_camera()
+                        time.sleep(1.0)
+                        result = take_photo()
+                    except Exception as e:
+                        logger.error(f"[SCHEDULER] Second attempt failed: {e}")
+
                 interval_min = settings_obj.photo_interval_min
             else:
                 interval_min = 2
                 logger.info(f"[SCHEDULER] Timelapse disabled. Sleeping {interval_min} minutes.")
+
         except Exception as e:
             logger.error(f"[SCHEDULER] Error during scheduler cycle: {e}")
             interval_min = 2
