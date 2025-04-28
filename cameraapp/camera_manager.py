@@ -133,6 +133,14 @@ class CameraManager:
     def restart(self) -> bool:
         with self.lock:
             return self._restart_camera()
+        
+    def release(self):
+        if self.cap and self.cap.isOpened():
+            self.cap.release()
+            self.cap = None
+
+    def is_open(self):
+        return self.cap is not None and self.cap.isOpened()
 
 
 # Optional: Singleton-Schutz & Cleanup
