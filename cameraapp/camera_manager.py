@@ -8,28 +8,21 @@ import atexit
 from .globals import app_globals
 
 
-if globals().get("camera") is not None:
-    print("[CameraManager] Warning: Existing camera instance found. Replacing it.")
-    globals()["camera"].stop()
-    globals()["camera"] = None
-
-def cleanup_camera():
-    if globals().get("camera"):
-        globals()["camera"].stop()
-
-atexit.register(cleanup_camera)
-
 class CameraManager:
-    def __init__(self, source=0, retry_delay=2.0, max_retries=5):
+    def __init__(self, source=0, retry_delay=2.0, max_retries=5, force_backend=cv2.CAP_V4L2):
         self.source = source
         self.retry_delay = retry_delay
         self.max_retries = max_retries
+        self.backend = force_backend
 
         self.cap = None
         self.lock = threading.Lock()
         self.running = True
         self.frame = None
-        # Öffne Kamera direkt bei Initialisierung
+        self.thread = None
+
+        print("[CameraManager] Initializing...")
+
         if not self._restart_camera():
             self.running = False
             print("[CameraManager] Failed to start camera thread due to unavailable camera.")
@@ -37,15 +30,13 @@ class CameraManager:
 
         self.thread = threading.Thread(target=self._capture_loop, daemon=True)
         self.thread.start()
-        globals()["camera"] = self
 
         app_globals.camera = self
-        
+        globals()["camera"] = self
 
     def _open_camera(self):
-        cap = cv2.VideoCapture(self.source, cv2.CAP_V4L2)
+        cap = cv2.VideoCapture(self.source, self.backend)
         if cap.isOpened():
-            # Testlesung
             ret, _ = cap.read()
             if ret:
                 print("[CameraManager] Camera opened and first frame read successfully")
@@ -57,7 +48,6 @@ class CameraManager:
             print("[CameraManager] Failed to open camera")
         return None
 
-
     def _restart_camera(self):
         print("[CameraManager] Restarting camera")
         if self.cap:
@@ -65,17 +55,29 @@ class CameraManager:
             self.cap = None
             self._wait_for_device_release()
 
-        attempts = 0
-        while attempts < self.max_retries:
+        for attempt in range(1, self.max_retries + 1):
             cap = self._open_camera()
             if cap:
                 self.cap = cap
                 return True
-            attempts += 1
-            print(f"[CameraManager] Retry {attempts}/{self.max_retries} failed...")
+            print(f"[CameraManager] Retry {attempt}/{self.max_retries} failed...")
             time.sleep(self.retry_delay)
 
         print("[CameraManager] Camera not available after retries")
+        return False
+
+    def _wait_for_device_release(self, timeout=5.0):
+        start = time.time()
+        while time.time() - start < timeout:
+            if os.path.exists("/dev/video0"):
+                cap = cv2.VideoCapture(self.source, self.backend)
+                if cap.isOpened():
+                    cap.release()
+                    print("[CameraManager] Device available again.")
+                    return True
+            print("[CameraManager] Waiting for /dev/video0 to be released...")
+            time.sleep(0.5)
+        print("[CameraManager] Timeout waiting for device to become available")
         return False
 
     def _capture_loop(self):
@@ -84,15 +86,8 @@ class CameraManager:
             return
 
         fail_count = 0
-
         while self.running:
-            if not self.cap:
-                print("[CameraManager] cap is None. Attempting to restart camera...")
-                if not self._restart_camera():
-                    time.sleep(self.retry_delay)
-                    continue
-
-            ret, frame = self.cap.read()
+            ret, frame = self.cap.read() if self.cap else (False, None)
 
             if not ret or frame is None:
                 fail_count += 1
@@ -111,17 +106,18 @@ class CameraManager:
             with self.lock:
                 self.frame = frame
 
-            time.sleep(0.01)  # Minimaler Delay, entlastet CPU
+            time.sleep(0.01)
 
     def is_available(self):
         with self.lock:
             return self.cap is not None and self.cap.isOpened()
 
-
     def get_frame(self):
         with self.lock:
             return self.frame.copy() if self.frame is not None else None
 
+    def get_latest_frame(self):
+        return self.get_frame()
 
     def stop(self):
         print("[CameraManager] Stopping camera")
@@ -131,40 +127,25 @@ class CameraManager:
             self.cap = None
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=2)
+        app_globals.camera = None
         globals()["camera"] = None
 
-
-    def get_latest_frame(self):
-        with self.lock:
-            return self.frame.copy() if self.frame is not None else None
-
-
-    def frame_provider():
-        with app_globals.latest_frame_lock:
-            return app_globals.latest_frame.copy() if app_globals.latest_frame is not None else None
-
-
-    def _wait_for_device_release(self, timeout=5.0):
-        start = time.time()
-        while time.time() - start < timeout:
-            if not os.path.exists("/dev/video0"):
-                print("[CameraManager] /dev/video0 not found, waiting...")
-            else:
-                cap = cv2.VideoCapture(self.source, cv2.CAP_V4L2)
-                if cap.isOpened():
-                    cap.release()
-                    print("[CameraManager] Device available again.")
-                    return True
-            time.sleep(0.5)
-        print("[CameraManager] Timeout waiting for device to become available")
-        return False
-
-
-
     def restart(self) -> bool:
-        """
-        Try to reopen/releases and reopen the same capture device.
-        Returns True on success.
-        """
         with self.lock:
             return self._restart_camera()
+
+
+# Optional: Singleton-Schutz & Cleanup
+
+def cleanup_camera():
+    if globals().get("camera"):
+        print("[CameraManager] Global cleanup triggered")
+        globals()["camera"].stop()
+        globals()["camera"] = None
+
+atexit.register(cleanup_camera)
+
+if globals().get("camera") is not None:
+    print("[CameraManager] Warning: Existing camera instance found. Replacing it.")
+    globals()["camera"].stop()
+    globals()["camera"] = None

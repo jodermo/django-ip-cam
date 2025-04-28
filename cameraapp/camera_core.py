@@ -3,7 +3,7 @@
 import os
 import cv2
 import glob
-
+import time
 from dotenv import load_dotenv
 from cameraapp.models import CameraSettings
 from .camera_utils import safe_restart_camera_stream, update_latest_frame, get_camera_settings, apply_cv_settings, try_open_camera, release_and_reset_camera, force_restart_livestream, get_camera_settings_safe, try_open_camera_safe, update_livestream_job
@@ -53,33 +53,39 @@ def init_camera(skip_stream=False):
     try:
         source = resolve_camera_source()
 
-        new_camera = CameraManager(source=source)
+        # Neue CameraManager-Instanz erzeugen
+        new_camera = CameraManager(source=source, force_backend=cv2.CAP_V4L2)
 
-        if new_camera.is_available() and new_camera.cap and new_camera.cap.isOpened():
-            app_globals.camera = new_camera
-            print("[CAMERA_CORE] CameraManager initialized and running.")
-
-            if not skip_stream and (not app_globals.livestream_job or not app_globals.livestream_job.running):
-                print("[CAMERA_CORE] Starting livestream job...")
-                from .livestream_job import LiveStreamJob
-                job = LiveStreamJob(
-                    camera_source=source,
-                    frame_callback=lambda f: update_latest_frame(f),
-                    shared_capture=new_camera.cap
-                )
-                job.start()
-                app_globals.livestream_job = job
-                update_livestream_job(job)
-
-            print(f"[DEBUG] camera is {app_globals.camera}")
-            print(f"[DEBUG] livestream_job is {app_globals.livestream_job}")
-
+        # Warten, bis Gerät verfügbar ist (max 5 Sekunden)
+        for attempt in range(5):
+            if new_camera.is_available() and new_camera.cap and new_camera.cap.isOpened():
+                break
+            print(f"[CAMERA_CORE] Waiting for camera... attempt {attempt + 1}/5")
+            time.sleep(1.0)
         else:
-            print("[CAMERA_CORE] Camera could not be initialized.")
+            print("[CAMERA_CORE] Camera device did not become available in time.")
+            return
+
+        app_globals.camera = new_camera
+        print("[CAMERA_CORE] CameraManager initialized and running.")
+
+        if not skip_stream and (not app_globals.livestream_job or not app_globals.livestream_job.running):
+            print("[CAMERA_CORE] Starting livestream job...")
+            from .livestream_job import LiveStreamJob
+            job = LiveStreamJob(
+                camera_source=source,
+                frame_callback=lambda f: update_latest_frame(f),
+                shared_capture=new_camera.cap
+            )
+            job.start()
+            app_globals.livestream_job = job
+            update_livestream_job(job)
+
+        print(f"[DEBUG] camera is {app_globals.camera}")
+        print(f"[DEBUG] livestream_job is {app_globals.livestream_job}")
 
     except Exception as e:
         print(f"[CAMERA_CORE] Exception during camera init: {e}")
-
 
 def reset_to_default():
     settings = CameraSettings.objects.first()
